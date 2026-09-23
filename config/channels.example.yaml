@@ -1,0 +1,20 @@
+# Canais/grupos monitorados. Copie para config/channels.yaml e edite —
+# esse arquivo de exemplo NÃO deve conter grupos/canais reais.
+#
+# platform: "telegram" ou "whatsapp"
+# chat_id:  pro Telegram, o ID numérico do chat (ou @username do canal
+#           público); pro WhatsApp, o JID completo (termina em @g.us pra
+#           grupo normal ou @newsletter pra canal).
+# label:    nome de exibição no portal (ex: nome do grupo).
+# category: opcional, categoria default se o parser não conseguir inferir.
+
+channels:
+  - platform: telegram
+    chat_id: "@exemplo_promocoes_tech"
+    label: "Exemplo Promoções Tech"
+    category: "eletronicos"
+
+  - platform: whatsapp
+    chat_id: "120363000000000000@newsletter"
+    label: "Exemplo Canal WhatsApp"
+    category: null

@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/
+media/
+config/channels.yaml
+*.session
+*.session-journal
+*.db
+.DS_Store

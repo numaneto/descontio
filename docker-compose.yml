@@ -1,0 +1,23 @@
+services:
+  web:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./media:/app/media
+      - ./config/channels.yaml:/app/config/channels.yaml:ro
+    restart: unless-stopped
+
+  telegram-worker:
+    build: .
+    command: ["python", "workers/telegram_worker.py"]
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./media:/app/media
+      - ./config/channels.yaml:/app/config/channels.yaml:ro
+    restart: unless-stopped
+    depends_on:
+      - web

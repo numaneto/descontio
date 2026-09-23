@@ -1,0 +1,25 @@
+<article class="offer-card {% if offer.parse_confidence < 0.5 %}low-confidence{% endif %}">
+    {% if offer.image_path %}
+    <img src="/media/{{ offer.image_path }}" alt="{{ offer.product_name or 'Oferta' }}" loading="lazy">
+    {% endif %}
+    <div class="offer-body">
+        <h3>{{ offer.product_name or "(produto não identificado)" }}</h3>
+        <p class="price">
+            {% if offer.price %}
+                {% if offer.price_original %}<span class="original">R$ {{ "%.2f"|format(offer.price_original) }}</span>{% endif %}
+                <span class="final">R$ {{ "%.2f"|format(offer.price) }}</span>
+            {% endif %}
+        </p>
+        {% if offer.coupon_code %}
+        <p class="coupon">Cupom: <code>{{ offer.coupon_code }}</code></p>
+        {% endif %}
+        <p class="meta">{{ offer.source_label }} · {{ offer.posted_at.strftime("%d/%m/%Y %H:%M") }}</p>
+        {% for link in offer.links_list %}
+        <a class="btn-link" href="{{ link }}" target="_blank" rel="noopener nofollow">Ver oferta ↗</a>
+        {% endfor %}
+        <details>
+            <summary>Texto original</summary>
+            <pre>{{ offer.raw_text }}</pre>
+        </details>
+    </div>
+</article>
