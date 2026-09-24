@@ -1,42 +1,176 @@
+:root {
+    --bg-main: #05070c;
+    --bg-surface: #10151f;
+    --bg-surface-2: #161c29;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #e7ecf3;
+    --text-secondary: #8b96a5;
+    --accent: #58a6ff;
+    --accent-strong: #3d8bf0;
+    --savings: #4ade80;
+}
+
 * { box-sizing: border-box; }
+
 body {
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: #0f0f12;
-    color: #e6e6e6;
+    font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-primary);
     margin: 0;
+    min-height: 100vh;
+    position: relative;
 }
-.topbar { padding: 1.5rem; text-align: center; border-bottom: 1px solid #2a2a2e; }
-.topbar h1 { margin: 0; }
-.subtitle { color: #999; margin: 0.25rem 0 0; }
-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-.filters { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+
+.bg-glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(circle at 50% 0%, rgba(88, 166, 255, 0.16), transparent 60%);
+    pointer-events: none;
+}
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(16, 21, 31, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.brand-icon { font-size: 1.6rem; }
+
+.brand-name {
+    font-family: "Poppins", "Inter", sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    letter-spacing: -0.01em;
+    background: linear-gradient(90deg, var(--accent), #a8d0ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.subtitle { color: var(--text-secondary); margin: 0.3rem 0 0; font-size: 0.9rem; }
+
+main { max-width: 1320px; margin: 0 auto; padding: 1.75rem 1.5rem 3rem; }
+
+.filters {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 1.75rem;
+    flex-wrap: wrap;
+}
+
 .filters input, .filters select, .filters button {
-    padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #333;
-    background: #1a1a1e; color: #eee;
+    padding: 0.55rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
 }
-.filters button { cursor: pointer; background: #2d6cdf; border-color: #2d6cdf; }
+
+.filters input { flex: 1 1 220px; }
+
+.filters input:focus, .filters select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.filters button {
+    cursor: pointer;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #04101f;
+    font-weight: 600;
+    transition: background 0.15s ease;
+}
+
+.filters button:hover { background: var(--accent-strong); }
+
 .offer-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 1rem;
+    gap: 1.1rem;
 }
+
 .offer-card {
-    background: #1a1a1e; border-radius: 10px; overflow: hidden;
-    border: 1px solid #2a2a2e;
+    background: var(--bg-surface);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
+
+.offer-card:hover {
+    border-color: rgba(88, 166, 255, 0.45);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(88, 166, 255, 0.12);
+}
+
 .offer-card.low-confidence { border-color: #7a5a00; }
-.offer-card img { width: 100%; height: 180px; object-fit: cover; }
-.offer-body { padding: 0.9rem; }
-.offer-body h3 { margin: 0 0 0.4rem; font-size: 1rem; }
-.price .original { text-decoration: line-through; color: #888; margin-right: 0.4rem; }
-.price .final { color: #4ade80; font-weight: bold; font-size: 1.1rem; }
-.coupon code { background: #2a2a2e; padding: 0.1rem 0.4rem; border-radius: 4px; }
-.meta { color: #888; font-size: 0.8rem; }
-.btn-link {
-    display: inline-block; margin-top: 0.5rem; padding: 0.4rem 0.8rem;
-    background: #2d6cdf; color: white; text-decoration: none; border-radius: 6px;
-    font-size: 0.85rem;
+
+.offer-card img { width: 100%; height: 180px; object-fit: cover; display: block; background: var(--bg-surface-2); }
+
+.offer-body { padding: 1rem; }
+
+.offer-body h3 {
+    margin: 0 0 0.5rem;
+    font-family: "Poppins", "Inter", sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.3;
 }
-details { margin-top: 0.5rem; font-size: 0.8rem; color: #aaa; }
+
+.price { margin: 0 0 0.5rem; }
+.price .original { text-decoration: line-through; color: var(--text-secondary); margin-right: 0.4rem; font-size: 0.85rem; }
+.price .final { color: var(--savings); font-weight: 700; font-size: 1.15rem; }
+
+.coupon code {
+    background: var(--bg-surface-2);
+    border: 1px dashed rgba(88, 166, 255, 0.4);
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    color: var(--accent);
+}
+
+.meta { color: var(--text-secondary); font-size: 0.78rem; margin: 0.4rem 0; }
+
+.btn-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.9rem;
+    background: var(--accent);
+    color: #04101f;
+    text-decoration: none;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s ease;
+}
+
+.btn-link:hover { background: var(--accent-strong); }
+
+details { margin-top: 0.6rem; font-size: 0.8rem; color: var(--text-secondary); }
+details summary { cursor: pointer; }
 pre { white-space: pre-wrap; word-break: break-word; }
-.empty { color: #888; text-align: center; grid-column: 1 / -1; }
+
+.empty {
+    color: var(--text-secondary);
+    text-align: center;
+    grid-column: 1 / -1;
+    padding: 3rem 1rem;
+}
