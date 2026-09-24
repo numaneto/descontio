@@ -14,6 +14,13 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 DEFAULT_PER_CHANNEL = 10
+ALLOWED_DAYS = {1, 7, 30}
+
+
+def _escape_like(value: str) -> str:
+    """Escapa os curingas do LIKE (`%`, `_`) pra que uma busca por esses
+    caracteres literais não vire um match-all/match-parcial indesejado."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 @router.get("/")
@@ -21,9 +28,22 @@ def index(
     request: Request,
     q: str | None = Query(default=None, description="Busca por palavra-chave"),
     source_group: str | None = Query(default=None),
-    days: int | None = Query(default=None, description="Só ofertas dos últimos N dias"),
+    days: str | None = Query(default=None, description="Só ofertas dos últimos N dias (1, 7 ou 30)"),
 ):
-    no_filters = not q and not source_group and not days
+    # `days` só aceita os valores conhecidos do filtro (1/7/30) — qualquer
+    # outra coisa (não numérico, negativo, fora da whitelist) é tratada como
+    # "sem filtro de data", em vez de estourar 422 ou aplicar um corte
+    # arbitrário.
+    days_int: int | None = None
+    if days:
+        try:
+            candidate = int(days)
+        except ValueError:
+            candidate = None
+        if candidate in ALLOWED_DAYS:
+            days_int = candidate
+
+    no_filters = not q and not source_group and not days_int
 
     with get_session() as session:
         if no_filters:
@@ -45,14 +65,15 @@ def index(
             stmt = select(Offer).where(Offer.archived == False).order_by(Offer.posted_at.desc())  # noqa: E712
 
             if q:
-                like = f"%{q}%"
+                like = f"%{_escape_like(q)}%"
                 stmt = stmt.where(
-                    (Offer.product_name.like(like)) | (Offer.raw_text.like(like))
+                    (Offer.product_name.like(like, escape="\\"))
+                    | (Offer.raw_text.like(like, escape="\\"))
                 )
             if source_group:
                 stmt = stmt.where(Offer.source_group == source_group)
-            if days:
-                cutoff = datetime.utcnow() - timedelta(days=days)
+            if days_int:
+                cutoff = datetime.utcnow() - timedelta(days=days_int)
                 stmt = stmt.where(Offer.posted_at >= cutoff)
 
             offers = session.exec(stmt.limit(200)).all()
@@ -85,6 +106,6 @@ def index(
             "groups": groups,
             "q": q or "",
             "source_group": source_group or "",
-            "days": days or "",
+            "days": days_int or "",
         },
     )
