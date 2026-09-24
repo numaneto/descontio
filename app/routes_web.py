@@ -21,7 +21,7 @@ def index(
     days: int | None = Query(default=None, description="Só ofertas dos últimos N dias"),
 ):
     with get_session() as session:
-        stmt = select(Offer).order_by(Offer.posted_at.desc())
+        stmt = select(Offer).where(Offer.archived == False).order_by(Offer.posted_at.desc())  # noqa: E712
 
         if q:
             like = f"%{q}%"

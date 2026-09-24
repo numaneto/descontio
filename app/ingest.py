@@ -1,13 +1,15 @@
 """Lógica compartilhada de ingestão: recebe um post bruto (de qualquer
 plataforma), roda o parser híbrido, dedup e persiste no banco."""
+import io
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
 
+from PIL import Image
 from sqlmodel import select
 
-from app.config import MEDIA_DIR
+from app.config import IMAGE_MAX_WIDTH, IMAGE_QUALITY, MEDIA_DIR
 from app.db import get_session
 from app.models import Offer
 from app.parsers.pipeline import extract
@@ -15,8 +17,28 @@ from app.parsers.pipeline import extract
 logger = logging.getLogger(__name__)
 
 
+def _compress_image(content: bytes) -> bytes:
+    """Redimensiona (max IMAGE_MAX_WIDTH de largura) e recomprime como JPEG
+    (qualidade IMAGE_QUALITY) pra reduzir o espaço ocupado em disco. Se a
+    imagem já for menor, só recomprime (sem upscale)."""
+    try:
+        with Image.open(io.BytesIO(content)) as img:
+            img = img.convert("RGB")
+            if img.width > IMAGE_MAX_WIDTH:
+                ratio = IMAGE_MAX_WIDTH / img.width
+                img = img.resize((IMAGE_MAX_WIDTH, int(img.height * ratio)), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=IMAGE_QUALITY, optimize=True)
+            return buf.getvalue()
+    except Exception:  # noqa: BLE001
+        logger.exception("Falha ao comprimir imagem, salvando original sem alteração")
+        return content
+
+
 def save_image_bytes(platform: str, message_id: str, content: bytes, ext: str = "jpg") -> str:
-    """Salva a imagem em disco e devolve o caminho relativo (pra servir via /media)."""
+    """Comprime, salva a imagem em disco e devolve o caminho relativo (pra
+    servir via /media)."""
+    content = _compress_image(content)
     subdir = MEDIA_DIR / platform
     subdir.mkdir(parents=True, exist_ok=True)
     filename = f"{message_id}.{ext}"

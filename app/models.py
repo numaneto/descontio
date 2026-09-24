@@ -33,6 +33,11 @@ class Offer(SQLModel, table=True):
     parse_confidence: float = 0.0
     engagement_score: int = 0  # reações + encaminhamentos, se disponível
 
+    # Retenção: quando True, a imagem física já foi apagada do disco (ver
+    # scripts/retention_cleanup.py) e a oferta some da busca padrão do
+    # portal — o texto/metadados continuam no banco (não é hard-delete).
+    archived: bool = Field(default=False, index=True)
+
     posted_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     ingested_at: datetime = Field(default_factory=datetime.utcnow)
 

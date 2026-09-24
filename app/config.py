@@ -22,6 +22,12 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/hub_offers.db")
 # Mídia
 MEDIA_DIR = Path(os.getenv("MEDIA_DIR", "./media")).resolve()
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+IMAGE_MAX_WIDTH = int(os.getenv("IMAGE_MAX_WIDTH", "800"))
+IMAGE_QUALITY = int(os.getenv("IMAGE_QUALITY", "80"))
+
+# Retenção: após RETENTION_DAYS, a oferta é arquivada (some da busca padrão
+# do portal) e a imagem física é apagada do disco (o texto/metadados ficam).
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "90"))
 
 # LLM fallback
 LLM_ENABLED = os.getenv("LLM_ENABLED", "false").lower() == "true"
