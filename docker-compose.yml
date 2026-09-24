@@ -13,6 +13,8 @@ services:
   telegram-worker:
     build: .
     command: ["python", "workers/telegram_worker.py"]
+    environment:
+      - PYTHONPATH=/app
     env_file: .env
     volumes:
       - ./data:/app/data
