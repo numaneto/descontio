@@ -1,7 +1,12 @@
 <article class="offer-card {% if offer.parse_confidence < 0.5 %}low-confidence{% endif %}">
-    {% if offer.image_path %}
-    <img src="/media/{{ offer.image_path }}" alt="{{ offer.product_name or 'Oferta' }}" loading="lazy">
-    {% endif %}
+    <div class="thumb">
+        {% if offer.image_path %}
+        <img src="/media/{{ offer.image_path }}" alt="{{ offer.product_name or 'Oferta' }}" loading="lazy">
+        {% else %}
+        <div class="thumb-placeholder">🛍️</div>
+        {% endif %}
+        <span class="badge-channel">{{ offer.source_label }}</span>
+    </div>
     <div class="offer-body">
         <h3>{{ offer.product_name or "(produto não identificado)" }}</h3>
         <p class="price">
@@ -13,7 +18,8 @@
         {% if offer.coupon_code %}
         <p class="coupon">Cupom: <code>{{ offer.coupon_code }}</code></p>
         {% endif %}
-        <p class="meta">{{ offer.source_label }} · {{ offer.posted_at.strftime("%d/%m/%Y %H:%M") }}</p>
+        <p class="snippet">{{ offer.raw_text|truncate(110) }}</p>
+        <p class="meta">{{ offer.posted_at.strftime("%d/%m/%Y %H:%M") }}</p>
         {% for link in offer.links_list %}
         <a class="btn-link" href="{{ link }}" target="_blank" rel="noopener nofollow">Ver oferta ↗</a>
         {% endfor %}
