@@ -57,3 +57,42 @@ def test_parse_regex_unstructured_text_low_confidence():
     result = parse_regex("Oi pessoal, bom dia! Alguém viu o preço do dólar hoje?")
     assert result.price is None
     assert result.confidence < 0.5
+
+
+# Bug real (produção, 2026-09-25): posts que mencionam "cupom de R$X off"
+# no corpo do texto tinham esse valor de desconto extraído como se fosse o
+# preço final do produto, porque "de"/"por" não eram ancorados ao início da
+# linha. Ex.: oferta de R$2.999 aparecendo como R$500 no portal.
+CUPOM_MENTION_EXAMPLE = """💥🙀 Placa de Vídeo PowerColor Reaper AMD Radeon RX 9060 XT 16GB
+
+💸: R$2.999 no pix + frete grátis!
+👉: https://s.shopee.com.br/30oFKTiNYL
+
+Na hora de finalizar aplica o cupom de R$500 off apenas no app!
+https://s.shopee.com.br/4ftAtRreEQ
+
+#anuncio"""
+
+BENCHPROMOS_CUPOM_EXAMPLE = """🔥 Notebook Lenovo IdeaPad Slim 3 AMD Ryzen 7 7735HS 8GB 512GB SSD 15.3" WUXGA Linux - R$ 3.219,00 🔥 #anúncio
+
+🎟 Cupom: Cupom de R$ 500 OFF no carrinho
+💸 R$ 3.219,00 (À Vista)
+
+🔗 https://benchpromos.com/promocao/exemplo"""
+
+
+def test_parse_regex_ignores_cupom_discount_as_price():
+    result = parse_regex(CUPOM_MENTION_EXAMPLE)
+    assert result.price == 2999.0
+
+
+def test_parse_regex_benchpromos_ignores_cupom_discount():
+    result = parse_regex(BENCHPROMOS_CUPOM_EXAMPLE)
+    assert result.price == 3219.0
+
+
+def test_parse_regex_thousand_separator_without_cents():
+    # "R$2.999" (sem centavos) não pode truncar pro primeiro dígito antes
+    # do ponto (bug real: virava R$2).
+    result = parse_regex("💰 R$ 2.835 PIX")
+    assert result.price == 2835.0

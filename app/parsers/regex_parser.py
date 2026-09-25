@@ -20,11 +20,33 @@ fallback via LLM (`llm_parser.py`) só é acionado quando nada abaixo bate.
 import re
 from dataclasses import dataclass, field
 
-_PRICE_RE = re.compile(r"R\$\s*([\d.]+,\d{2}|\d+)")
-_VALOR_LABEL_RE = re.compile(r"(?:valor|pre[cç]o)\s*:?\s*R\$\s*([\d.]+,\d{2}|\d+)", re.IGNORECASE)
-_DE_RE = re.compile(r"\bde\s*:?\s*R\$\s*([\d.]+,\d{2}|\d+)", re.IGNORECASE)
-_POR_RE = re.compile(r"\bpor\s*:?\s*R\$\s*([\d.]+,\d{2}|\d+)", re.IGNORECASE)
+# Número de preço em formato BR: milhar separado por ponto (opcional, em
+# grupos de 3 dígitos) + centavos separados por vírgula (opcional). Cobre
+# "74", "1.234", "1.234,56", "2.999" (sem centavos) e "11.699,10". Usar
+# sempre este padrão (em vez de `[\d.]+,\d{2}|\d+` isolado) evita truncar
+# valores tipo "R$2.999" no primeiro dígito antes do ponto (bug real: preço
+# de R$2.999 virando R$2).
+_PRICE_NUM = r"\d+(?:\.\d{3})*(?:,\d{2})?"
+_PRICE_RE = re.compile(r"R\$\s*(" + _PRICE_NUM + r")")
+_VALOR_LABEL_RE = re.compile(r"(?:valor|pre[cç]o)\s*:?\s*R\$\s*(" + _PRICE_NUM + r")", re.IGNORECASE)
+# 💸/💰 são usados como rótulo de preço final em vários posts (ex: Shopee/
+# AliExpress: "💸: R$2.999 no pix", "💸 R$ 3.219,00 (À Vista)",
+# "💰 R$ 467") — mesma prioridade de "valor:".
+_EMOJI_VALOR_RE = re.compile(r"[💸💰]\s*:?\s*R\$\s*(" + _PRICE_NUM + r")")
+# "de"/"por" são preposições comuns em português — sem ancorar no início da
+# linha, uma frase como "aplica o cupom de R$500 off" (desconto do cupom,
+# não o preço do produto) batia com _DE_RE e virava o preço final errado
+# (bug real observado: ofertas de R$2.999/R$3.219/etc. exibindo R$500).
+# Só considera "de"/"por" como rótulo de preço quando abre a linha (com no
+# máximo alguns caracteres não-alfanuméricos antes, tipo emoji/pontuação).
+_LINE_START_PREFIX = r"^[^\w\n]{0,4}"
+_DE_RE = re.compile(_LINE_START_PREFIX + r"de\s*:?\s*R\$\s*(" + _PRICE_NUM + r")", re.IGNORECASE | re.MULTILINE)
+_POR_RE = re.compile(_LINE_START_PREFIX + r"por\s*:?\s*R\$\s*(" + _PRICE_NUM + r")", re.IGNORECASE | re.MULTILINE)
 _CUPOM_RE = re.compile(r"cupom(?:\s+de\s+loja)?\s*:?\s*\+?\s*([A-Z0-9]{4,})", re.IGNORECASE)
+# Usado só pelo fallback genérico (último recurso): remove menções a "cupom"
+# antes de procurar um "R$ X" solto, pra não confundir o valor de desconto
+# do cupom com o preço do produto.
+_CUPOM_MENTION_RE = re.compile(r"cupom[^\n]*", re.IGNORECASE)
 _URL_RE = re.compile(r"https?://\S+")
 _HASHTAG_OR_EMOJI_RE = re.compile(
     r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF]|#\w+", re.UNICODE
@@ -67,11 +89,14 @@ def parse_regex(text: str) -> ParsedOffer:
     price_original: float | None = None
 
     valor_match = _VALOR_LABEL_RE.search(text)
+    emoji_valor_match = _EMOJI_VALOR_RE.search(text)
     por_match = _POR_RE.search(text)
     de_match = _DE_RE.search(text)
 
     if valor_match:
         price = _to_float(valor_match.group(1))
+    elif emoji_valor_match:
+        price = _to_float(emoji_valor_match.group(1))
     elif por_match:
         price = _to_float(por_match.group(1))
         if de_match:
@@ -80,8 +105,10 @@ def parse_regex(text: str) -> ParsedOffer:
         # só achou "De:" sem "Por:" — trata como preço único
         price = _to_float(de_match.group(1))
     else:
-        # último recurso: primeiro "R$ X" solto no texto
-        generic_match = _PRICE_RE.search(text)
+        # último recurso: primeiro "R$ X" solto no texto, mas ignorando
+        # menções a "cupom" (ex: "cupom de R$500 off"), que são valor de
+        # desconto e não o preço do produto.
+        generic_match = _PRICE_RE.search(_CUPOM_MENTION_RE.sub("", text))
         if generic_match:
             price = _to_float(generic_match.group(1))
 
