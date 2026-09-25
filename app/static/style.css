@@ -49,18 +49,21 @@ body {
     color: var(--text-primary);
 }
 
-.brand-icon { font-size: 1.6rem; }
+.brand-icon {
+    width: 32px;
+    height: 32px;
+    display: block;
+}
 
 .brand-name {
     font-family: "Poppins", "Inter", sans-serif;
     font-weight: 700;
     font-size: 1.4rem;
     letter-spacing: -0.01em;
-    background: linear-gradient(90deg, var(--accent), #a8d0ff);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--text-primary);
 }
+
+.brand-name-accent { color: var(--accent); }
 
 .subtitle { color: var(--text-secondary); margin: 0.3rem 0 0; font-size: 0.9rem; }
 

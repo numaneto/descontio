@@ -10,9 +10,11 @@
     </select>
     <select name="days">
         <option value="">Qualquer data</option>
-        <option value="1" {% if days == 1 %}selected{% endif %}>Últimas 24h</option>
-        <option value="7" {% if days == 7 %}selected{% endif %}>Últimos 7 dias</option>
-        <option value="30" {% if days == 30 %}selected{% endif %}>Últimos 30 dias</option>
+        {% for preset in days_presets %}
+        <option value="{{ preset }}" {% if days == preset %}selected{% endif %}>
+            {% if preset == 1 %}Últimas 24h{% else %}Últimos {{ preset }} dias{% endif %}
+        </option>
+        {% endfor %}
     </select>
     <button type="submit">Filtrar</button>
 </form>

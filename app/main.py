@@ -11,7 +11,7 @@ from app.routes_web import router as web_router
 
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="HubOffers", description="Agregador pessoal de promoções")
+app = FastAPI(title="descont.io", description="Agregador pessoal de promoções")
 
 app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

@@ -1,4 +1,8 @@
-# HubOffers
+# descont.io
+
+> Nome interno do projeto/repositório: `hub-offers` (sem alterações de infra
+> por trás do rebrand — LXC, chave SSH, repositório git seguem com o nome
+> antigo). O nome de marca/produto voltado pro usuário é **descont.io**.
 
 Agregador pessoal de promoções: junta os posts de ofertas que já circulam em
 grupos/canais do **Telegram** e **canais do WhatsApp** — texto, foto e link,
