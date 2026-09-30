@@ -45,3 +45,21 @@ class Offer(SQLModel, table=True):
         # (source_platform, source_group, source_message_id) deve ser único —
         # aplicado via índice composto na migração (scripts/init_db.py).
         pass
+
+
+class ChannelPollState(SQLModel, table=True):
+    """Estado de polling por canal — substitui a conexão viva do worker
+    antigo (client.on(events.NewMessage())) por ciclos curtos e
+    independentes: cada execução de scripts/poll_telegram.py busca só
+    mensagens com id > last_message_id (via iter_messages(min_id=...)),
+    evita rebaixar imagens de posts já vistos, e não depende de uma conexão
+    que precisa ficar viva por dias sem falhar silenciosamente (ver
+    incidente 2026-09-30 em STATUS.md: o listener parou de despachar
+    NewMessage por 9h+ sem nenhum erro nos logs)."""
+
+    __tablename__ = "channel_poll_state"
+
+    platform: str = Field(primary_key=True)
+    chat_id: str = Field(primary_key=True)
+    last_message_id: int = Field(default=0)
+    last_polled_at: Optional[datetime] = None
