@@ -26,7 +26,13 @@ class Offer(SQLModel, table=True):
     price_original: Optional[float] = None
     coupon_code: Optional[str] = None
     links: str = "[]"  # JSON-encoded list[str]
-    category: Optional[str] = None
+    category: Optional[str] = None  # legado: string livre, mantido por compatibilidade
+
+    # Classificação estruturada (Classe/Subclasse) — nullable de propósito:
+    # ofertas existentes ficam sem classificação até um processo futuro
+    # (manual ou LLM) preencher; nenhuma oferta é bloqueada por falta disso.
+    category_id: Optional[int] = Field(default=None, foreign_key="categories.id", index=True)
+    product_id: Optional[int] = Field(default=None, foreign_key="products.id", index=True)
 
     # Metadados de parsing/engajamento
     parse_method: str = "unmatched"  # "regex" | "llm" | "unmatched"
@@ -63,3 +69,34 @@ class ChannelPollState(SQLModel, table=True):
     chat_id: str = Field(primary_key=True)
     last_message_id: int = Field(default=0)
     last_polled_at: Optional[datetime] = None
+
+
+class Category(SQLModel, table=True):
+    """Árvore de classificação (Classe/Subclasse/...), auto-referenciada
+    via `parent_id` — ex.: "Hardware" (raiz) -> "GPUs" (filho) ->
+    "NVIDIA"/"AMD" (futuro neto, quando fizer sentido detalhar por
+    fabricante). Sem limite de profundidade fixo: cada nível só é criado
+    quando a granularidade compensar (não adianta subclasse com 1 produto
+    só)."""
+
+    __tablename__ = "categories"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    slug: str = Field(index=True, unique=True)
+    parent_id: Optional[int] = Field(default=None, foreign_key="categories.id", index=True)
+
+
+class Product(SQLModel, table=True):
+    """Entidade canônica de produto — várias `Offer` (posts brutos, um por
+    anúncio/repostagem) podem apontar pro mesmo `Product` depois de
+    classificadas/normalizadas. É o que permite, no futuro, responder
+    "histórico de preço da GPU X" agregando várias ofertas diferentes em
+    vez de tratar cada post como um item isolado."""
+
+    __tablename__ = "products"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    category_id: Optional[int] = Field(default=None, foreign_key="categories.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
