@@ -216,3 +216,11 @@ pre { white-space: pre-wrap; word-break: break-word; }
     grid-column: 1 / -1;
     padding: 3rem 1rem;
 }
+
+/* Admin: tabela de canais */
+.admin-channels { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+.admin-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.admin-table th, .admin-table td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.admin-table button { border: none; border-radius: 6px; padding: 0.3rem 0.8rem; cursor: pointer; font-weight: 600; }
+.badge-on { background: #1f9d55; color: #fff; }
+.badge-off { background: #6b7280; color: #fff; }

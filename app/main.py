@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import MEDIA_DIR
 from app.db import init_db
+from app.routes_admin import router as admin_router
 from app.routes_api import router as api_router
 from app.routes_api_public import router as api_public_router
 from app.routes_web import router as web_router
@@ -20,6 +21,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(web_router)
 app.include_router(api_router)
 app.include_router(api_public_router)
+app.include_router(admin_router)
 
 
 @app.on_event("startup")

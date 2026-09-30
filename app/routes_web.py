@@ -13,6 +13,8 @@ from app.models import Offer
 from app.offers_query import (
     DAYS_PRESETS,
     DEFAULT_PER_CHANNEL,
+    display_source_label,
+    load_hidden_channel_keys,
     parse_days,
     parse_price,
     query_offers,
@@ -98,9 +100,15 @@ def index(
 
         # SQLModel não aceita atributos fora do schema declarado — construímos
         # um dict simples por oferta pra passar os links já decodificados ao
-        # template, sem mexer no modelo.
+        # template, sem mexer no modelo. `source_label` é sobrescrito pelo
+        # rótulo genérico quando o canal tem hide_brand=True (admin UI).
+        hidden_keys = load_hidden_channel_keys(session)
         offers = [
-            {**offer.model_dump(), "links_list": json.loads(offer.links or "[]")}
+            {
+                **offer.model_dump(),
+                "links_list": json.loads(offer.links or "[]"),
+                "source_label": display_source_label(offer, hidden_keys),
+            }
             for offer in offers
         ]
 

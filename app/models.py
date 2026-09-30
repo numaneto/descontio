@@ -100,3 +100,25 @@ class Product(SQLModel, table=True):
     name: str = Field(index=True)
     category_id: Optional[int] = Field(default=None, foreign_key="categories.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Channel(SQLModel, table=True):
+    """Canal/grupo monitorado — antes vivia só em config/channels.yaml
+    (estático, exigia editar arquivo + redeploy pra mudar). Agora é a
+    fonte de verdade em runtime pra permitir habilitar/desabilitar e
+    ocultar a marca (nome do canal) na interface pública pela admin UI,
+    sem precisar editar YAML nem reiniciar container. O YAML populado
+    manualmente continua existindo só como seed inicial (ver
+    scripts/seed_channels_from_yaml.py)."""
+
+    __tablename__ = "channels"
+
+    platform: str = Field(primary_key=True)
+    chat_id: str = Field(primary_key=True)
+    label: str
+    category: Optional[str] = None
+    enabled: bool = Field(default=True, index=True)
+    # Quando True, a interface pública (portal + API) mostra um rótulo
+    # genérico em vez do nome real do canal — a oferta continua visível,
+    # só a marca/fonte fica oculta.
+    hide_brand: bool = Field(default=False)

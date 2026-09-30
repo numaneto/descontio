@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from app.db import get_session
 from app.models import Offer
-from app.offers_query import RESULT_LIMIT, parse_days, parse_price, query_offers
+from app.offers_query import RESULT_LIMIT, display_source_label, load_hidden_channel_keys, parse_days, parse_price, query_offers
 
 router = APIRouter(prefix="/api/v1", tags=["public-api"])
 
@@ -39,7 +39,7 @@ class OfferOut(BaseModel):
         from_attributes = True
 
 
-def _to_offer_out(offer: Offer) -> OfferOut:
+def _to_offer_out(offer: Offer, hidden_keys: set[tuple[str, str]]) -> OfferOut:
     try:
         links = json.loads(offer.links or "[]")
     except json.JSONDecodeError:
@@ -56,10 +56,9 @@ def _to_offer_out(offer: Offer) -> OfferOut:
         links=links,
         image_url=f"/media/{offer.image_path}" if offer.image_path else None,
         category=offer.category,
-        # Nome do canal/grupo de origem — hoje exposto (mesmo campo já
-        # mostrado no portal HTML). Candidato a ficar oculto quando a
-        # admin UI de canais existir (ver ROADMAP.md Bloco G).
-        source=offer.source_label,
+        # Nome do canal/grupo de origem — oculto (rótulo genérico) quando
+        # o canal tem hide_brand=True na admin UI (/admin/channels).
+        source=display_source_label(offer, hidden_keys),
         posted_at=posted_at,
     )
 
@@ -92,7 +91,8 @@ def list_offers(
             price_max=price_max_val,
             limit=limit,
         )
-    return OfferListOut(count=len(offers), results=[_to_offer_out(o) for o in offers])
+        hidden_keys = load_hidden_channel_keys(session)
+    return OfferListOut(count=len(offers), results=[_to_offer_out(o, hidden_keys) for o in offers])
 
 
 @router.get("/offers/{offer_id}", response_model=OfferOut)
@@ -101,4 +101,5 @@ def get_offer(offer_id: int) -> OfferOut:
         offer = session.get(Offer, offer_id)
         if offer is None or offer.archived:
             raise HTTPException(status_code=404, detail="oferta nao encontrada")
-        return _to_offer_out(offer)
+        hidden_keys = load_hidden_channel_keys(session)
+        return _to_offer_out(offer, hidden_keys)
