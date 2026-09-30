@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}admin · canais — descont.io{% endblock %}
+{% block content %}
+<section class="admin-channels">
+    <h1>Canais monitorados</h1>
+    <p class="subtitle">Desabilitar um canal para de coletar novas ofertas dele. Ocultar marca esconde o nome do canal na interface pública e na API, sem remover as ofertas já publicadas.</p>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Plataforma</th>
+                <th>Canal</th>
+                <th>Categoria</th>
+                <th>Habilitado</th>
+                <th>Marca oculta</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in channels %}
+            <tr>
+                <td>{{ c.platform }}</td>
+                <td>{{ c.label }}</td>
+                <td>{{ c.category or "—" }}</td>
+                <td>
+                    <form method="post" action="/admin/channels/{{ c.platform }}/{{ c.chat_id }}/toggle-enabled">
+                        <button type="submit" class="{{ 'badge-on' if c.enabled else 'badge-off' }}">
+                            {{ "Sim" if c.enabled else "Não" }}
+                        </button>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" action="/admin/channels/{{ c.platform }}/{{ c.chat_id }}/toggle-hide-brand">
+                        <button type="submit" class="{{ 'badge-on' if c.hide_brand else 'badge-off' }}">
+                            {{ "Sim" if c.hide_brand else "Não" }}
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

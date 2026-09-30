@@ -38,6 +38,13 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 # Canais monitorados
 CHANNELS_CONFIG_PATH = BASE_DIR / "config" / "channels.yaml"
 
+# Admin (habilitar/desabilitar canais, ocultar marca) — HTTP Basic Auth
+# simples, protegendo só as rotas /admin/*. Sem valor default de senha de
+# propósito: se não configurado, o admin fica inacessível (falha segura)
+# em vez de usar uma senha fraca conhecida.
+ADMIN_USER = os.getenv("ADMIN_USER", "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 # Portal
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))

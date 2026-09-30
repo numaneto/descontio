@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
 
-from app.models import Offer
+from app.models import Channel, Offer
 
 # Presets exibidos no dropdown do filtro de tempo (portal) — além destes,
 # qualquer valor inteiro entre 1 e MAX_DAYS também é aceito (ex.: um link
@@ -72,6 +72,28 @@ def parse_price(value: str | float | None) -> float | None:
     if 0 <= candidate <= MAX_PRICE:
         return candidate
     return None
+
+
+GENERIC_SOURCE_LABEL = "Fonte reservada"
+
+
+def load_hidden_channel_keys(session: Session) -> set[tuple[str, str]]:
+    """Conjunto de (platform, chat_id) com `hide_brand=True` — usado pra
+    decidir, na hora de montar a resposta (portal ou API), se o nome real
+    do canal deve ser trocado por um rótulo genérico. Uma query só por
+    request, não por oferta."""
+    rows = session.exec(select(Channel.platform, Channel.chat_id).where(Channel.hide_brand == True)).all()  # noqa: E712
+    return {(platform, str(chat_id)) for platform, chat_id in rows}
+
+
+def display_source_label(offer: Offer, hidden_keys: set[tuple[str, str]]) -> str:
+    """Nome do canal a exibir pro público: o rótulo real, a menos que o
+    canal tenha `hide_brand=True` na admin UI, caso em que mostramos um
+    rótulo genérico (a oferta continua visível, só a marca é ocultada)."""
+    key = (offer.source_platform, str(offer.source_group))
+    if key in hidden_keys:
+        return GENERIC_SOURCE_LABEL
+    return offer.source_label
 
 
 def query_offers(
