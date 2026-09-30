@@ -19,7 +19,7 @@
         <p class="coupon">Cupom: <code>{{ offer.coupon_code }}</code></p>
         {% endif %}
         <p class="snippet">{{ offer.raw_text|truncate(110) }}</p>
-        <p class="meta">{{ offer.posted_at.strftime("%d/%m/%Y %H:%M") }}</p>
+        <p class="meta">{{ offer.posted_at | local_time }}</p>
         {% for link in offer.links_list %}
         <a class="btn-link" href="{{ link }}" target="_blank" rel="noopener nofollow">Ver oferta ↗</a>
         {% endfor %}

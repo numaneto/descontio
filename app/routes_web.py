@@ -1,7 +1,8 @@
 """Rotas do portal web (HTML server-rendered, feed de ofertas com filtros)."""
 import json
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query, Request
 from fastapi.templating import Jinja2Templates
@@ -13,6 +14,24 @@ from app.models import Offer
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+# Todos os timestamps são armazenados em UTC (posted_at vem do Telethon ou
+# de datetime.utcnow()) — a exibição precisa converter pro fuso do usuário
+# (Brasil não tem horário de verão desde 2019, então America/Sao_Paulo é
+# sempre UTC-3, sem ambiguidade de DST).
+LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def _to_local(value: datetime) -> str:
+    """Converte um datetime (naive ou aware, assumido UTC se naive) pro
+    fuso local e formata — usado como filtro Jinja (`| local_time`)."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(LOCAL_TZ).strftime("%d/%m/%Y %H:%M")
+
+
+templates.env.filters["local_time"] = _to_local
+
 
 DEFAULT_PER_CHANNEL = 10
 # Presets exibidos no dropdown do filtro de tempo — além destes, qualquer
