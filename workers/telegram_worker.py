@@ -41,7 +41,41 @@ async def main() -> None:
             "o worker vai conectar mas não vai processar nada."
         )
 
-    @client.on(events.NewMessage(chats=chat_ids or None))
+    await client.start()
+
+    # NAO chamar catch_up() aqui: descobrimos que catch_up() deixa o cliente
+    # num estado onde novos eventos NewMessage param de ser entregues (bug
+    # documentado do Telethon - catch_up()/get_difference "consome" o estado
+    # de atualizacoes e o loop de eventos normal nunca mais dispara, mesmo
+    # sem erro no log). Sintoma observado: worker ficava "conectado" e sem
+    # erros, mas 0 eventos chegavam por 24h+ (nem no handler de debug sem
+    # filtro nenhum) - ver STATUS.md 2026-09-30. Corrigido removendo essa
+    # chamada e garantindo o recebimento de updates explicitamente abaixo.
+    await client.set_receive_updates(True)
+
+    # IMPORTANTE: resolve cada canal para uma entidade real (chamada de rede)
+    # ANTES de registrar o handler. O filtro `chats=` do Telethon casa updates
+    # recebidos (que trazem só o ID interno do peer) contra o cache de
+    # entidades do cliente — se o username nunca foi resolvido nesta sessão
+    # (ex.: logo após um restart do container), o filtro simplesmente nunca
+    # bate e a mensagem é descartada em silêncio, sem erro no log. Resolver
+    # explicitamente aqui popula o cache e corrige isso (bug real observado:
+    # worker ficava "conectado" e sem erros, mas nada era ingerido desde o
+    # último restart — ver STATUS.md 2026-09-30).
+    resolved_chats = []
+    for cid in chat_ids:
+        try:
+            entity = await client.get_entity(cid)
+            resolved_chats.append(entity)
+        except Exception:  # noqa: BLE001
+            logger.exception("Não consegui resolver o canal %s, ficará sem listener", cid)
+
+    @client.on(events.NewMessage())
+    async def _debug_any(event) -> None:
+        chat = await event.get_chat()
+        logger.info("DEBUG raw event de chat_id=%s username=%s", event.chat_id, getattr(chat, 'username', None))
+
+    @client.on(events.NewMessage(chats=resolved_chats or None))
     async def handler(event) -> None:
         chat = await event.get_chat()
         chat_username = getattr(chat, "username", None)
@@ -81,9 +115,11 @@ async def main() -> None:
             engagement_score=engagement,
         )
 
-    logger.info("Worker do Telegram conectando...")
-    await client.start()
-    logger.info("Conectado. Escutando %d canais/grupos configurados.", len(chat_ids))
+    logger.info(
+        "Conectado. Escutando %d/%d canais/grupos configurados (resolvidos com sucesso).",
+        len(resolved_chats),
+        len(chat_ids),
+    )
     await client.run_until_disconnected()
 
 
