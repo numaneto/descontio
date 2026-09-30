@@ -1,4 +1,4 @@
-"""Configurações centrais do HubOffers, lidas de variáveis de ambiente (.env)."""
+"""Configurações centrais do descont.io, lidas de variáveis de ambiente (.env)."""
 import os
 from pathlib import Path
 
@@ -17,7 +17,7 @@ TELEGRAM_SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "")
 WHATSAPP_WEBHOOK_SECRET = os.getenv("WHATSAPP_WEBHOOK_SECRET", "")
 
 # Banco de dados
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/hub_offers.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/descontio.db")
 
 # Mídia
 MEDIA_DIR = Path(os.getenv("MEDIA_DIR", "./media")).resolve()

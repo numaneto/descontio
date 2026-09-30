@@ -1,4 +1,4 @@
-"""Modelos de dados (SQLModel) do HubOffers."""
+"""Modelos de dados (SQLModel) do descont.io."""
 from datetime import datetime
 from typing import Optional
 

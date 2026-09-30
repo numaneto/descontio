@@ -7,7 +7,7 @@ Uso:
 
 Requer TELEGRAM_API_ID/API_HASH/SESSION_STRING já preenchidos no .env
 (ver scripts/telegram_login.py). Só lista grupos e canais — ignora chats
-1-a-1 e o "Saved Messages", que não fazem sentido pro HubOffers.
+1-a-1 e o "Saved Messages", que não fazem sentido pro descont.io.
 """
 import sys
 from pathlib import Path
