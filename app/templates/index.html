@@ -4,8 +4,17 @@
     <input type="text" name="q" placeholder="Buscar produto..." value="{{ q }}">
     <select name="category">
         <option value="">Todas as categorias</option>
-        {% for item in categories %}
-        <option value="{{ item.slug }}" {% if item.slug == category %}selected{% endif %}>{{ item.name }}</option>
+        {% for node in category_tree %}
+        {% if node.children %}
+        <optgroup label="{{ node.category.name }}">
+            <option value="{{ node.category.slug }}" {% if node.category.slug == category %}selected{% endif %}>Todas em {{ node.category.name }}</option>
+            {% for child in node.children %}
+            <option value="{{ child.slug }}" {% if child.slug == category %}selected{% endif %}>— {{ child.name }}</option>
+            {% endfor %}
+        </optgroup>
+        {% else %}
+        <option value="{{ node.category.slug }}" {% if node.category.slug == category %}selected{% endif %}>{{ node.category.name }}</option>
+        {% endif %}
         {% endfor %}
     </select>
     <select name="days">
@@ -18,6 +27,16 @@
     </select>
     <input type="text" inputmode="decimal" name="price_min" placeholder="Preço mín. (ex.: 1.000,00)" value="{{ price_min }}">
     <input type="text" inputmode="decimal" name="price_max" placeholder="Preço máx. (ex.: 5.000,00)" value="{{ price_max }}">
+    <select name="sort">
+        {% for option in sort_options %}
+        <option value="{{ option }}" {% if option == sort %}selected{% endif %}>
+            {% if option == "price_asc" %}Menor preço
+            {% elif option == "price_desc" %}Maior preço
+            {% else %}Mais recentes
+            {% endif %}
+        </option>
+        {% endfor %}
+    </select>
     <button type="submit">Filtrar</button>
 </form>
 

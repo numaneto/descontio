@@ -19,8 +19,10 @@ from app.offers_query import (
     API_DEFAULT_DAYS,
     MAX_DAYS,
     RESULT_LIMIT,
+    SORT_OPTIONS,
     parse_days,
     parse_price,
+    parse_sort,
     query_offers,
 )
 from app.rate_limit import RateLimited
@@ -92,6 +94,10 @@ def list_offers(
     price_max: str | None = Query(default=None, description="Preço máximo (R$)"),
     price_min_cents: int | None = Query(default=None, ge=0, description="Preço mínimo em centavos (preferencial)"),
     price_max_cents: int | None = Query(default=None, ge=0, description="Preço máximo em centavos (preferencial)"),
+    sort: str | None = Query(
+        default=None,
+        description=f"Ordenação: {', '.join(SORT_OPTIONS)} (default recent).",
+    ),
     limit: int = Query(default=60, ge=1, le=MAX_LIMIT, description=f"Máximo de itens retornados (até {MAX_LIMIT})"),
 ) -> OfferListOut:
     # Sem `days` explícito, a API assume uma janela curta (ofertas mudam
@@ -110,6 +116,7 @@ def list_offers(
             days_int=days_int,
             price_min_cents=minimum_cents,
             price_max_cents=maximum_cents,
+            sort=parse_sort(sort),
             limit=limit,
         )
         category_ids = {offer.category_id for offer in offers if offer.category_id is not None}

@@ -30,6 +30,43 @@ DEFAULT_PER_CHANNEL = 10
 SQL_PREFETCH_LIMIT = 5000
 RESULT_LIMIT = 200
 
+# Opções aceitas pelo parâmetro `sort` (portal e API) — "recent" é o default
+# histórico (nunca muda sem o usuário pedir explicitamente via UI/query).
+SORT_OPTIONS = ("recent", "price_asc", "price_desc")
+DEFAULT_SORT = "recent"
+
+
+def parse_sort(value: str | None) -> str:
+    """Valor desconhecido/ausente cai no default em vez de dar erro 422 —
+    mesma filosofia de `parse_days` (nunca quebrar um link compartilhado
+    por causa de um parâmetro opcional)."""
+    return value if value in SORT_OPTIONS else DEFAULT_SORT
+
+
+def _category_and_descendant_ids(session: Session, category_slug: str) -> list[int] | None:
+    """Resolve um slug (categoria-pai ou subcategoria) pra lista de ids a
+    filtrar. Filtrar por uma categoria-pai (ex.: "informatica") deve incluir
+    as ofertas já classificadas nas subcategorias filhas (ex.:
+    "placas-de-video"), não só as que ficaram sem subcategoria — por isso
+    a expansão recursiva em vez de comparar `category_id` direto. Devolve
+    `None` quando o slug não existe (chamador decide tratar como "sem
+    resultado")."""
+    root = session.exec(
+        select(Category.id).where(Category.slug == category_slug)
+    ).first()
+    if root is None:
+        return None
+
+    ids = [root]
+    pending = [root]
+    while pending:
+        children = session.exec(
+            select(Category.id).where(Category.parent_id.in_(pending))
+        ).all()
+        pending = [child for child in children if child not in ids]
+        ids.extend(pending)
+    return ids
+
 
 def normalize(value: str) -> str:
     """Remove acentos e normaliza pra minúsculo, pra busca não depender de
@@ -70,6 +107,17 @@ def parse_price(value: str | float | None) -> int | None:
     return parse_brl_to_cents(value)
 
 
+def _apply_sort(stmt, sort: str):
+    if sort == "price_asc":
+        # `price_cents IS NULL` primeiro no ORDER BY empurra ofertas sem
+        # preço pro fim da lista em vez de aparecerem primeiro (SQLite
+        # trata NULL como o menor valor possível por padrão).
+        return stmt.order_by(Offer.price_cents.is_(None), Offer.price_cents.asc())
+    if sort == "price_desc":
+        return stmt.order_by(Offer.price_cents.is_(None), Offer.price_cents.desc())
+    return stmt.order_by(Offer.posted_at.desc())
+
+
 def query_offers(
     session: Session,
     *,
@@ -78,19 +126,19 @@ def query_offers(
     days_int: int | None = None,
     price_min_cents: int | None = None,
     price_max_cents: int | None = None,
+    sort: str = DEFAULT_SORT,
     limit: int = RESULT_LIMIT,
 ) -> list[Offer]:
     """Filtro central (sem o caso especial de "home sem filtro nenhum",
     que é só do portal — ver routes_web.py)."""
-    stmt = select(Offer).where(Offer.archived == False).order_by(Offer.posted_at.desc())  # noqa: E712
+    stmt = select(Offer).where(Offer.archived == False)  # noqa: E712
+    stmt = _apply_sort(stmt, sort)
 
     if category_slug:
-        category_id = session.exec(
-            select(Category.id).where(Category.slug == category_slug)
-        ).first()
-        if category_id is None:
+        category_ids = _category_and_descendant_ids(session, category_slug)
+        if not category_ids:
             return []
-        stmt = stmt.where(Offer.category_id == category_id)
+        stmt = stmt.where(Offer.category_id.in_(category_ids))
     if days_int:
         cutoff = datetime.utcnow() - timedelta(days=days_int)
         stmt = stmt.where(Offer.posted_at >= cutoff)

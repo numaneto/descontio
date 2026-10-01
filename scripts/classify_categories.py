@@ -8,7 +8,7 @@ import httpx
 from sqlmodel import select
 
 from app.config import LLM_API_KEY, LLM_BASE_URL, LLM_ENABLED, LLM_MODEL
-from app.categories import classify_category_slug
+from app.categories import classify_category_slug, classify_subcategory_slug
 from app.db import get_session
 from app.models import Category, Offer
 from app.parsers.llm_parser import ALLOWED_CATEGORIES, _parse_json, _record_usage
@@ -118,14 +118,26 @@ def main() -> None:
             )
             if result is None:
                 raise SystemExit("Classificação interrompida após falha do provedor")
+
+            # Refinamento de subcategoria é sempre local/keyword-based (não
+            # depende do LLM) — roda em cima do slug de nível 1 que acabou
+            # de ser decidido, local ou via LLM, pra manter as duas vias
+            # consistentes com a mesma granularidade final.
+            final_slug_by_offer = {
+                offer.id: (
+                    classify_subcategory_slug(offer.product_name, result.get(offer.id, "outros"))
+                    or result.get(offer.id, "outros")
+                )
+                for offer in offers
+            }
             categories = {
                 item.slug: item
                 for item in session.exec(
-                    select(Category).where(Category.slug.in_(set(result.values())))
+                    select(Category).where(Category.slug.in_(set(final_slug_by_offer.values())))
                 ).all()
             }
             for offer in offers:
-                slug = result.get(offer.id, "outros")
+                slug = final_slug_by_offer.get(offer.id, "outros")
                 category = categories.get(slug)
                 if category:
                     offer.category_id = category.id
