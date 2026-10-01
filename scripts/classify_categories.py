@@ -52,7 +52,7 @@ def classify_batch(offers: list[Offer]) -> dict[int, str] | None:
                 "temperature": 0,
                 "response_format": {"type": "json_object"},
             },
-            timeout=60,
+            timeout=120,
         )
         response.raise_for_status()
         payload = response.json()
