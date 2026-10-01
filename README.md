@@ -140,6 +140,13 @@ O portal aceita preços em notação brasileira (`5.060,00`, `5060,00`) ou de
 máquina (`5060.00`). A busca remove acentos e consulta somente o nome público
 normalizado, nunca o texto bruto privado da origem.
 
+Categorias usam uma taxonomia fechada. Novas ofertas são classificadas pelo
+Offer Formatter; o histórico pode ser preenchido sem custo de LLM com:
+
+```bash
+python scripts/classify_categories.py --local --batch-size 500
+```
+
 A API é aberta para leitura:
 
 - anônimo: 30 requisições por hora/IP;

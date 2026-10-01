@@ -8,6 +8,7 @@ import httpx
 from sqlmodel import select
 
 from app.config import LLM_API_KEY, LLM_BASE_URL, LLM_ENABLED, LLM_MODEL
+from app.categories import classify_category_slug
 from app.db import get_session
 from app.models import Category, Offer
 from app.parsers.llm_parser import ALLOWED_CATEGORIES, _parse_json, _record_usage
@@ -78,9 +79,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch-size", type=int, default=25)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Classifica toda a fila localmente, sem consumir LLM.",
+    )
     args = parser.parse_args()
 
-    if not LLM_ENABLED or not LLM_API_KEY:
+    if not args.local and (not LLM_ENABLED or not LLM_API_KEY):
         raise SystemExit("LLM_ENABLED/LLM_API_KEY não configurados")
 
     processed = 0
@@ -102,7 +108,14 @@ def main() -> None:
             if not offers:
                 break
 
-            result = classify_batch(offers)
+            result = (
+                {
+                    offer.id: classify_category_slug(offer.product_name)
+                    for offer in offers
+                }
+                if args.local
+                else classify_batch(offers)
+            )
             if result is None:
                 raise SystemExit("Classificação interrompida após falha do provedor")
             categories = {
