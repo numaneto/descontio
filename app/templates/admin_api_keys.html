@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}admin · API keys — descont.io{% endblock %}
+{% block content %}
+<section class="admin-channels">
+    <h1>API keys</h1>
+    <p><a href="/admin/channels">← Gerenciar canais</a></p>
+    <p class="subtitle">Sem key, cada IP tem um limite bem baixo (anti-abuso). Com uma key válida, o limite é o configurado abaixo — envie no header <code>X-API-Key</code>.</p>
+
+    {% if new_key %}
+    <div class="admin-newkey">
+        <strong>Key gerada (copie agora, não será mostrada de novo):</strong>
+        <code>{{ new_key }}</code>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/admin/api-keys/new" class="admin-form">
+        <input type="text" name="label" placeholder="Rótulo (ex: app do Fulano)" required>
+        <input type="number" name="rate_limit_per_hour" value="1000" min="1">
+        <button type="submit">Gerar nova key</button>
+    </form>
+
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Rótulo</th>
+                <th>Limite/hora</th>
+                <th>Criada em</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for k in keys %}
+            <tr>
+                <td>{{ k.label }}</td>
+                <td>{{ k.rate_limit_per_hour }}</td>
+                <td>{{ k.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+                <td>{{ "Revogada" if k.revoked_at else "Ativa" }}</td>
+                <td>
+                    {% if not k.revoked_at %}
+                    <form method="post" action="/admin/api-keys/{{ k.id }}/revoke">
+                        <button type="submit" class="badge-off">Revogar</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

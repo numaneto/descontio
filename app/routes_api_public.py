@@ -14,7 +14,17 @@ from pydantic import BaseModel
 
 from app.db import get_session
 from app.models import Offer
-from app.offers_query import RESULT_LIMIT, display_source_label, load_hidden_channel_keys, parse_days, parse_price, query_offers
+from app.offers_query import (
+    API_DEFAULT_DAYS,
+    MAX_DAYS,
+    RESULT_LIMIT,
+    display_source_label,
+    load_hidden_channel_keys,
+    parse_days,
+    parse_price,
+    query_offers,
+)
+from app.rate_limit import RateLimited
 
 router = APIRouter(prefix="/api/v1", tags=["public-api"])
 
@@ -68,15 +78,20 @@ class OfferListOut(BaseModel):
     results: list[OfferOut]
 
 
-@router.get("/offers", response_model=OfferListOut)
+@router.get("/offers", response_model=OfferListOut, dependencies=[RateLimited])
 def list_offers(
     q: str | None = Query(default=None, description="Busca por palavra-chave (múltiplos termos, sem acento/caixa)"),
-    days: str | None = Query(default=None, description="Só ofertas dos últimos N dias (1-365)"),
+    days: str | None = Query(
+        default=None,
+        description=f"Só ofertas dos últimos N dias (1-{MAX_DAYS}). Default {API_DEFAULT_DAYS} se omitido.",
+    ),
     price_min: str | None = Query(default=None, description="Preço mínimo (R$)"),
     price_max: str | None = Query(default=None, description="Preço máximo (R$)"),
     limit: int = Query(default=60, ge=1, le=MAX_LIMIT, description=f"Máximo de itens retornados (até {MAX_LIMIT})"),
 ) -> OfferListOut:
-    days_int = parse_days(days)
+    # Sem `days` explícito, a API assume uma janela curta (ofertas mudam
+    # rápido) em vez de devolver o histórico inteiro — ver offers_query.py.
+    days_int = parse_days(days) if days is not None else API_DEFAULT_DAYS
     price_min_val = parse_price(price_min)
     price_max_val = parse_price(price_max)
     if price_min_val is not None and price_max_val is not None and price_min_val > price_max_val:
@@ -95,7 +110,7 @@ def list_offers(
     return OfferListOut(count=len(offers), results=[_to_offer_out(o, hidden_keys) for o in offers])
 
 
-@router.get("/offers/{offer_id}", response_model=OfferOut)
+@router.get("/offers/{offer_id}", response_model=OfferOut, dependencies=[RateLimited])
 def get_offer(offer_id: int) -> OfferOut:
     with get_session() as session:
         offer = session.get(Offer, offer_id)

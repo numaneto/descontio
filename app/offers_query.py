@@ -11,10 +11,19 @@ from app.models import Channel, Offer
 
 # Presets exibidos no dropdown do filtro de tempo (portal) — além destes,
 # qualquer valor inteiro entre 1 e MAX_DAYS também é aceito (ex.: um link
-# compartilhado com "?days=45"), só os presets é que aparecem na UI.
-DAYS_PRESETS = (1, 3, 7, 15, 30, 90)
-MAX_DAYS = 365
+# compartilhado com "?days=10"), só os presets é que aparecem na UI.
+# Limitado a 15 dias porque é também o teto de RETENTION_DAYS (app/config.py)
+# — ofertas mudam rápido (pesquisa: mediana de validade de cupom é ~7 dias),
+# não faz sentido oferecer um preset de 30/90 dias se o dado já foi
+# arquivado/apagado bem antes disso.
+DAYS_PRESETS = (1, 3, 7, 15)
+MAX_DAYS = 15
 MAX_PRICE = 1_000_000.0
+
+# Default de `days` quando a API pública é chamada sem o parâmetro — mais
+# curto que o MAX_DAYS do portal porque consumidores de API tendem a querer
+# "o que há de mais recente" por padrão (ver app/routes_api_public.py).
+API_DEFAULT_DAYS = 7
 
 DEFAULT_PER_CHANNEL = 10
 # Limite de resultados retornados numa busca filtrada — a filtragem por

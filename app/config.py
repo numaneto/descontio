@@ -27,7 +27,11 @@ IMAGE_QUALITY = int(os.getenv("IMAGE_QUALITY", "80"))
 
 # Retenção: após RETENTION_DAYS, a oferta é arquivada (some da busca padrão
 # do portal) e a imagem física é apagada do disco (o texto/metadados ficam).
-RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "90"))
+# 15 dias (não 90): ofertas mudam rápido — pesquisa de mercado mostra que a
+# mediana de validade de um cupom/promoção é ~7 dias, e a maioria dos
+# aggregators mantém o item "buscável" por no máximo ~15-30 dias depois
+# disso. Ver docs/07-descontio.md (home-nw-docs) pra decisão completa.
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "15"))
 
 # LLM fallback
 LLM_ENABLED = os.getenv("LLM_ENABLED", "false").lower() == "true"

@@ -5,8 +5,9 @@ pro escopo de uso pessoal de hoje (poucos admins, sem dado sensível além
 do próprio painel); revisar se o projeto crescer pra múltiplos operadores.
 """
 import secrets
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -14,7 +15,8 @@ from sqlmodel import select
 
 from app.config import ADMIN_PASSWORD, ADMIN_USER
 from app.db import get_session
-from app.models import Channel
+from app.models import ApiKey, Channel
+from app.rate_limit import generate_api_key, hash_api_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="app/templates")
@@ -68,3 +70,45 @@ def toggle_hide_brand(platform: str, chat_id: str, _: str = Depends(require_admi
         session.add(channel)
         session.commit()
     return RedirectResponse(url="/admin/channels", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/api-keys")
+def list_api_keys(request: Request, _: str = Depends(require_admin)):
+    with get_session() as session:
+        keys = session.exec(select(ApiKey).order_by(ApiKey.created_at.desc())).all()
+    # `new_key` só existe logo após criação (query param ?new=... de uso
+    # único) — nunca é lido de volta do banco, porque não fica armazenado.
+    new_key = request.query_params.get("new")
+    return templates.TemplateResponse(
+        request, "admin_api_keys.html", {"keys": keys, "new_key": new_key}
+    )
+
+
+@router.post("/api-keys/new")
+def create_api_key(
+    request: Request,
+    label: str = Form(...),
+    rate_limit_per_hour: int = Form(1000),
+    _: str = Depends(require_admin),
+):
+    raw_key = generate_api_key()
+    with get_session() as session:
+        session.add(
+            ApiKey(key_hash=hash_api_key(raw_key), label=label, rate_limit_per_hour=rate_limit_per_hour)
+        )
+        session.commit()
+    # Redireciona com a key crua na query string só pra essa exibição única
+    # — não fica persistida em lugar nenhum, só o hash fica no banco.
+    return RedirectResponse(url=f"/admin/api-keys?new={raw_key}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/api-keys/{key_id}/revoke")
+def revoke_api_key(key_id: int, _: str = Depends(require_admin)):
+    with get_session() as session:
+        api_key = session.get(ApiKey, key_id)
+        if api_key is None:
+            raise HTTPException(status_code=404, detail="key nao encontrada")
+        api_key.revoked_at = datetime.utcnow()
+        session.add(api_key)
+        session.commit()
+    return RedirectResponse(url="/admin/api-keys", status_code=status.HTTP_303_SEE_OTHER)

@@ -224,3 +224,9 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .admin-table button { border: none; border-radius: 6px; padding: 0.3rem 0.8rem; cursor: pointer; font-weight: 600; }
 .badge-on { background: #1f9d55; color: #fff; }
 .badge-off { background: #6b7280; color: #fff; }
+
+/* Admin: form de nova API key */
+.admin-form { display: flex; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+.admin-form input { padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; }
+.admin-form button { border: none; border-radius: 6px; padding: 0.4rem 1rem; cursor: pointer; font-weight: 600; background: #2563eb; color: #fff; }
+.admin-newkey { background: rgba(31,157,85,0.15); border: 1px solid #1f9d55; border-radius: 8px; padding: 0.8rem 1rem; margin: 1rem 0; word-break: break-all; }
