@@ -100,12 +100,17 @@ CATEGORY_KEYWORDS = (
 SUBCATEGORY_KEYWORDS: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] = {
     "informatica": (
         (
-            "Placas de vídeo", "placas-de-video",
-            ("placa de video", "geforce", "radeon rx", "rtx ", "gtx "),
-        ),
-        (
+            # Notebook checado antes de "placas-de-video": um notebook que
+            # cita a GPU dedicada no título (ex.: "Notebook ... RTX 5070")
+            # é um notebook, não uma placa de vídeo avulsa — a ordem aqui
+            # decide o desempate (classify_subcategory_slug usa a primeira
+            # palavra-chave que bater).
             "Notebooks", "notebooks",
             ("notebook", "laptop", "ultrabook"),
+        ),
+        (
+            "Placas de vídeo", "placas-de-video",
+            ("placa de video", "geforce", "radeon rx", "rtx ", "gtx "),
         ),
         (
             "Componentes", "componentes",
