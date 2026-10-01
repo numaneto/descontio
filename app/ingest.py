@@ -3,7 +3,7 @@ plataforma), roda o parser híbrido, dedup e persiste no banco."""
 import io
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PIL import Image
@@ -11,7 +11,7 @@ from sqlmodel import select
 
 from app.config import IMAGE_MAX_WIDTH, IMAGE_QUALITY, MEDIA_DIR
 from app.db import get_session
-from app.models import Offer
+from app.models import Offer, RejectedInput
 from app.parsers.pipeline import extract
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,29 @@ def ingest_post(
 
         parsed, method = extract(text)
 
+        if not parsed.is_offer:
+            rejected = RejectedInput(
+                source_platform=platform,
+                source_group=group_id,
+                source_message_id=message_id,
+                raw_text=text,
+                reason=parsed.rejection_reason or "não classificado como oferta",
+                expires_at=datetime.utcnow() + timedelta(days=7),
+            )
+            session.add(rejected)
+            session.commit()
+            if image_path:
+                image_file = MEDIA_DIR / image_path
+                if image_file.exists():
+                    image_file.unlink()
+            logger.info(
+                "Entrada rejeitada: %s/%s (%s)",
+                platform,
+                message_id,
+                rejected.reason,
+            )
+            return None
+
         offer = Offer(
             source_platform=platform,
             source_group=group_id,
@@ -86,6 +109,7 @@ def ingest_post(
             price=parsed.price,
             price_original=parsed.price_original,
             coupon_code=parsed.coupon_code,
+            source_links=json.dumps(parsed.links),
             links=json.dumps(parsed.links),
             category=category_default,
             parse_method=method,

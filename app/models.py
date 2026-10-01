@@ -25,6 +25,9 @@ class Offer(SQLModel, table=True):
     price: Optional[float] = None
     price_original: Optional[float] = None
     coupon_code: Optional[str] = None
+    # `source_links` é privado/auditável; `links` contém somente URLs
+    # públicas já transformadas pelas regras de afiliado.
+    source_links: str = "[]"  # JSON-encoded list[str]
     links: str = "[]"  # JSON-encoded list[str]
     category: Optional[str] = None  # legado: string livre, mantido por compatibilidade
 
@@ -140,3 +143,36 @@ class ApiKey(SQLModel, table=True):
     rate_limit_per_hour: int = Field(default=1000)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     revoked_at: Optional[datetime] = None
+
+
+class RejectedInput(SQLModel, table=True):
+    """Entrada descartada pelo Offer Formatter, mantida por sete dias para
+    auditoria e ajuste do prompt sem poluir a tabela pública de ofertas."""
+
+    __tablename__ = "rejected_inputs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source_platform: str = Field(index=True)
+    source_group: str = Field(index=True)
+    source_message_id: str = Field(index=True)
+    raw_text: str = ""
+    reason: str
+    rejected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    expires_at: datetime = Field(index=True)
+
+
+class LlmUsageEvent(SQLModel, table=True):
+    """Consumo real devolvido pelo provedor OpenAI-compatible."""
+
+    __tablename__ = "llm_usage_events"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    provider: str = "openai-compatible"
+    model: str = Field(index=True)
+    operation: str = Field(index=True)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    estimated_cost_usd: float = 0.0
+    success: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)

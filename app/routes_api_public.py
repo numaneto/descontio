@@ -18,8 +18,6 @@ from app.offers_query import (
     API_DEFAULT_DAYS,
     MAX_DAYS,
     RESULT_LIMIT,
-    display_source_label,
-    load_hidden_channel_keys,
     parse_days,
     parse_price,
     query_offers,
@@ -42,14 +40,13 @@ class OfferOut(BaseModel):
     links: list[str]
     image_url: str | None
     category: str | None
-    source: str
     posted_at: datetime
 
     class Config:
         from_attributes = True
 
 
-def _to_offer_out(offer: Offer, hidden_keys: set[tuple[str, str]]) -> OfferOut:
+def _to_offer_out(offer: Offer) -> OfferOut:
     try:
         links = json.loads(offer.links or "[]")
     except json.JSONDecodeError:
@@ -66,9 +63,6 @@ def _to_offer_out(offer: Offer, hidden_keys: set[tuple[str, str]]) -> OfferOut:
         links=links,
         image_url=f"/media/{offer.image_path}" if offer.image_path else None,
         category=offer.category,
-        # Nome do canal/grupo de origem — oculto (rótulo genérico) quando
-        # o canal tem hide_brand=True na admin UI (/admin/channels).
-        source=display_source_label(offer, hidden_keys),
         posted_at=posted_at,
     )
 
@@ -106,8 +100,7 @@ def list_offers(
             price_max=price_max_val,
             limit=limit,
         )
-        hidden_keys = load_hidden_channel_keys(session)
-    return OfferListOut(count=len(offers), results=[_to_offer_out(o, hidden_keys) for o in offers])
+    return OfferListOut(count=len(offers), results=[_to_offer_out(o) for o in offers])
 
 
 @router.get("/offers/{offer_id}", response_model=OfferOut, dependencies=[RateLimited])
@@ -116,5 +109,4 @@ def get_offer(offer_id: int) -> OfferOut:
         offer = session.get(Offer, offer_id)
         if offer is None or offer.archived:
             raise HTTPException(status_code=404, detail="oferta nao encontrada")
-        hidden_keys = load_hidden_channel_keys(session)
-        return _to_offer_out(offer, hidden_keys)
+        return _to_offer_out(offer)

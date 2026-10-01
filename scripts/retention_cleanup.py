@@ -20,11 +20,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlmodel import select  # noqa: E402
+from sqlmodel import delete, select  # noqa: E402
 
 from app.config import MEDIA_DIR, RETENTION_DAYS  # noqa: E402
 from app.db import get_session  # noqa: E402
-from app.models import Offer  # noqa: E402
+from app.models import Offer, RejectedInput  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +33,10 @@ logger = logging.getLogger(__name__)
 def run(dry_run: bool = False) -> None:
     cutoff = datetime.utcnow() - timedelta(days=RETENTION_DAYS)
     with get_session() as session:
+        if not dry_run:
+            session.exec(delete(RejectedInput).where(RejectedInput.expires_at < datetime.utcnow()))
+            session.commit()
+
         stmt = select(Offer).where(Offer.archived == False, Offer.posted_at < cutoff)  # noqa: E712
         offers = session.exec(stmt).all()
 

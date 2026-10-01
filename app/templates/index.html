@@ -2,12 +2,6 @@
 {% block content %}
 <form class="filters" method="get" action="/">
     <input type="text" name="q" placeholder="Buscar produto..." value="{{ q }}">
-    <select name="source_group">
-        <option value="">Todos os grupos</option>
-        {% for group_id, label in groups %}
-        <option value="{{ group_id }}" {% if group_id == source_group %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
     <select name="days">
         <option value="">Qualquer data</option>
         {% for preset in days_presets %}
@@ -25,7 +19,7 @@
     {% for offer in offers %}
         {% include "partials/offer_card.html" %}
     {% else %}
-        <p class="empty">Nenhuma oferta encontrada ainda — configure os workers de ingestão.</p>
+        <p class="empty">Nenhuma oferta encontrada.</p>
     {% endfor %}
 </div>
 {% endblock %}

@@ -33,6 +33,8 @@ LLM_ENABLED = os.getenv("LLM_ENABLED", "false").lower() == "true"
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://127.0.0.1:8090/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+LLM_INPUT_COST_PER_MILLION = float(os.getenv("LLM_INPUT_COST_PER_MILLION", "0"))
+LLM_OUTPUT_COST_PER_MILLION = float(os.getenv("LLM_OUTPUT_COST_PER_MILLION", "0"))
 
 # Canais monitorados
 CHANNELS_CONFIG_PATH = BASE_DIR / "config" / "channels.yaml"

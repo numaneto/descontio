@@ -5,7 +5,6 @@
         {% else %}
         <div class="thumb-placeholder">🛍️</div>
         {% endif %}
-        <span class="badge-channel">{{ offer.source_label }}</span>
     </div>
     <div class="offer-body">
         <h3>{{ offer.product_name or "(produto não identificado)" }}</h3>
@@ -18,14 +17,9 @@
         {% if offer.coupon_code %}
         <p class="coupon">Cupom: <code>{{ offer.coupon_code }}</code></p>
         {% endif %}
-        <p class="snippet">{{ offer.raw_text|truncate(110) }}</p>
         <p class="meta">{{ offer.posted_at | local_time }}</p>
         {% for link in offer.links_list %}
         <a class="btn-link" href="{{ link }}" target="_blank" rel="noopener nofollow">Ver oferta ↗</a>
         {% endfor %}
-        <details>
-            <summary>Texto original</summary>
-            <pre>{{ offer.raw_text }}</pre>
-        </details>
     </div>
 </article>

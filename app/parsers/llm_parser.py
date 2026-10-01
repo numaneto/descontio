@@ -1,62 +1,123 @@
-"""Fallback de extração via LLM — só é chamado quando o regex não consegue
-identificar preço + nome de produto com confiança suficiente (ver
-pipeline.py). Usa qualquer endpoint compatível com a API de chat
-completions da OpenAI (self-hosted, ex: Copilot Bridge, Ollama com wrapper,
-ou a própria OpenAI)."""
+"""Classificação e normalização via endpoint OpenAI-compatible."""
 import json
 import logging
+import re
 
 import httpx
 
-from app.config import LLM_API_KEY, LLM_BASE_URL, LLM_ENABLED, LLM_MODEL
+from app.config import (
+    LLM_API_KEY,
+    LLM_BASE_URL,
+    LLM_ENABLED,
+    LLM_INPUT_COST_PER_MILLION,
+    LLM_MODEL,
+    LLM_OUTPUT_COST_PER_MILLION,
+)
+from app.db import get_session
+from app.models import LlmUsageEvent
 from app.parsers.regex_parser import ParsedOffer
 
 logger = logging.getLogger(__name__)
 
-_PROMPT = """Extraia os dados de uma oferta/promoção a partir do texto de um post \
-de grupo de promoções (Telegram/WhatsApp). Responda SOMENTE com um JSON no \
-formato abaixo, sem nenhum texto adicional:
+_PROMPT = """Você é o Offer Formatter do descont.io. Analise uma entrada bruta \
+recebida de uma fonte privada. Decida se ela anuncia uma oferta comercial \
+acionável. Conversa, notícia, pedido de ajuda, enquete, aviso do canal, sorteio \
+sem compra e mensagem sem produto/link não são ofertas.
+
+Não copie nome, bordão, convite, hashtag ou propaganda da fonte. Produza somente \
+os dados da oferta, de forma agnóstica à origem. Responda SOMENTE com JSON:
 
 {{
-  "product_name": "<nome do produto ou null>",
+  "is_offer": true ou false,
+  "rejection_reason": "<motivo curto se não for oferta, senão null>",
+  "product_name": "<nome limpo e específico do produto/serviço ou null>",
   "price": <preço final em número, ou null>,
-  "price_original": <preço original antes do desconto, ou null se não houver>,
-  "coupon_code": "<código do cupom, ou null>"
+  "price_original": <preço original antes do desconto, ou null>,
+  "coupon_code": "<código do cupom, ou null>",
+  "offer_url": "<URL que leva à oferta ou null>"
 }}
 
-Texto do post:
+Texto:
 ---
 {text}
 ---
 """
 
 
+def _record_usage(payload: dict, success: bool) -> None:
+    usage = payload.get("usage") or {}
+    # OpenAI usa prompt/completion; Abacus RouteLLM usa input/output.
+    prompt_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+    completion_tokens = int(
+        usage.get("completion_tokens") or usage.get("output_tokens") or 0
+    )
+    total_tokens = int(usage.get("total_tokens") or prompt_tokens + completion_tokens)
+    cost = (
+        prompt_tokens * LLM_INPUT_COST_PER_MILLION
+        + completion_tokens * LLM_OUTPUT_COST_PER_MILLION
+    ) / 1_000_000
+    try:
+        with get_session() as session:
+            session.add(
+                LlmUsageEvent(
+                    model=payload.get("model") or LLM_MODEL,
+                    operation="offer_formatter",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    estimated_cost_usd=cost,
+                    success=success,
+                )
+            )
+            session.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("Falha ao registrar consumo do LLM")
+
+
+def _parse_json(content: str) -> dict:
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
+    return json.loads(cleaned)
+
+
 def parse_llm(text: str) -> ParsedOffer:
     if not LLM_ENABLED:
         return ParsedOffer()
 
+    payload: dict | None = None
     try:
         response = httpx.post(
             f"{LLM_BASE_URL}/chat/completions",
-            headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+            headers={
+                "Authorization": "Bearer " + LLM_API_KEY,
+                # O WAF do RouteLLM rejeita o User-Agent padrão do httpx.
+                "User-Agent": "curl/8.0",
+            },
             json={
                 "model": LLM_MODEL,
                 "messages": [{"role": "user", "content": _PROMPT.format(text=text)}],
                 "temperature": 0,
+                "response_format": {"type": "json_object"},
             },
             timeout=30,
         )
         response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        data = json.loads(content)
-    except Exception:  # noqa: BLE001 — fallback deliberadamente tolerante a falhas
-        logger.exception("Falha ao chamar o LLM fallback, mantendo post como não-parseado")
+        payload = response.json()
+        data = _parse_json(payload["choices"][0]["message"]["content"])
+        _record_usage(payload, success=True)
+    except Exception:  # noqa: BLE001
+        if payload is not None:
+            _record_usage(payload, success=False)
+        response_body = response.text[:500] if "response" in locals() else ""
+        logger.exception("Falha ao chamar o Offer Formatter: %s", response_body)
         return ParsedOffer()
 
     return ParsedOffer(
+        is_offer=bool(data.get("is_offer")),
+        rejection_reason=data.get("rejection_reason"),
         product_name=data.get("product_name"),
         price=data.get("price"),
         price_original=data.get("price_original"),
         coupon_code=data.get("coupon_code"),
-        confidence=0.6,  # confiança fixa moderada — não validamos o retorno do LLM
+        links=[data["offer_url"]] if data.get("offer_url") else [],
+        confidence=0.9 if data.get("is_offer") else 1.0,
     )

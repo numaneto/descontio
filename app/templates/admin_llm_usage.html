@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Uso de LLM — descont.io{% endblock %}
+{% block content %}
+<section class="admin-channels">
+    <h1>Uso do Offer Formatter</h1>
+    <p>Tokens reportados pelo provedor e custo estimado conforme os preços configurados no ambiente.</p>
+
+    <table class="admin-table">
+        <thead>
+            <tr><th>Modelo</th><th>Chamadas</th><th>Entrada</th><th>Saída</th><th>Total</th><th>Custo estimado</th></tr>
+        </thead>
+        <tbody>
+        {% for model, calls, prompt, completion, total, cost in summary %}
+            <tr>
+                <td>{{ model }}</td>
+                <td>{{ calls }}</td>
+                <td>{{ prompt or 0 }}</td>
+                <td>{{ completion or 0 }}</td>
+                <td>{{ total or 0 }}</td>
+                <td>US$ {{ "%.6f"|format(cost or 0) }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6">Nenhuma chamada registrada.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Últimas chamadas</h2>
+    <table class="admin-table">
+        <thead>
+            <tr><th>Data</th><th>Modelo</th><th>Tokens</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+        {% for event in recent %}
+            <tr>
+                <td>{{ event.created_at }}</td>
+                <td>{{ event.model }}</td>
+                <td>{{ event.total_tokens }}</td>
+                <td>{{ "OK" if event.success else "Falha" }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

@@ -11,11 +11,12 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlmodel import select
 
 from app.config import ADMIN_PASSWORD, ADMIN_USER
 from app.db import get_session
-from app.models import ApiKey, Channel
+from app.models import ApiKey, Channel, LlmUsageEvent
 from app.rate_limit import generate_api_key, hash_api_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -112,3 +113,26 @@ def revoke_api_key(key_id: int, _: str = Depends(require_admin)):
         session.add(api_key)
         session.commit()
     return RedirectResponse(url="/admin/api-keys", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/llm-usage")
+def llm_usage(request: Request, _: str = Depends(require_admin)):
+    with get_session() as session:
+        summary = session.exec(
+            select(
+                LlmUsageEvent.model,
+                func.count(LlmUsageEvent.id),
+                func.sum(LlmUsageEvent.prompt_tokens),
+                func.sum(LlmUsageEvent.completion_tokens),
+                func.sum(LlmUsageEvent.total_tokens),
+                func.sum(LlmUsageEvent.estimated_cost_usd),
+            ).group_by(LlmUsageEvent.model)
+        ).all()
+        recent = session.exec(
+            select(LlmUsageEvent).order_by(LlmUsageEvent.created_at.desc()).limit(100)
+        ).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_llm_usage.html",
+        {"summary": summary, "recent": recent},
+    )

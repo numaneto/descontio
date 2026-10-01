@@ -1,30 +1,35 @@
-"""Pipeline híbrido: regex primeiro (sem custo, cobre a maioria dos posts
-já bem formatados), LLM só como fallback pra texto livre sem rótulos
-reconhecíveis."""
+"""Offer Formatter: pré-filtro barato e normalização agnóstica via LLM."""
 import re
 
+from app.config import LLM_ENABLED
 from app.parsers.llm_parser import parse_llm
 from app.parsers.regex_parser import ParsedOffer, parse_regex
 
 _URL_RE = re.compile(r"https?://\S+")
-
-# Abaixo desse valor de confiança do regex, tenta o fallback de LLM.
-_MIN_CONFIDENCE = 0.5
+_COMMERCIAL_SIGNAL_RE = re.compile(
+    r"R\$|pre[cç]o|valor|cupom|desconto|oferta|promo[cç][aã]o|por apenas|pix",
+    re.IGNORECASE,
+)
 
 
 def extract(text: str) -> tuple[ParsedOffer, str]:
-    """Retorna (ParsedOffer, metodo) onde metodo é 'regex', 'llm' ou 'unmatched'."""
+    """Retorna (ParsedOffer, método), rejeitando ruído antes de gastar tokens."""
     regex_result = parse_regex(text)
 
-    if regex_result.confidence >= _MIN_CONFIDENCE:
+    if not _URL_RE.search(text) or not _COMMERCIAL_SIGNAL_RE.search(text):
+        regex_result.is_offer = False
+        regex_result.rejection_reason = "sem URL ou sinal comercial"
+        return regex_result, "prefilter-rejected"
+
+    if LLM_ENABLED:
+        llm_result = parse_llm(text)
+        if llm_result.is_offer is not None:
+            llm_result.links = llm_result.links or _URL_RE.findall(text)
+            return llm_result, "llm"
+
+    if regex_result.is_offer:
         return regex_result, "regex"
 
-    llm_result = parse_llm(text)
-    if llm_result.confidence > 0:
-        # Preserva links extraídos por regex (o LLM não é confiável pra isso)
-        llm_result.links = llm_result.links or _URL_RE.findall(text)
-        return llm_result, "llm"
-
-    # Nenhum dos dois conseguiu — devolve o melhor que o regex achou mesmo
-    # assim (pode ter só links, por exemplo), marcado como não-confiável.
+    regex_result.is_offer = False
+    regex_result.rejection_reason = "dados insuficientes para formar uma oferta"
     return regex_result, "unmatched"

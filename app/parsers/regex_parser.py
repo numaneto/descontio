@@ -55,6 +55,8 @@ _HASHTAG_OR_EMOJI_RE = re.compile(
 
 @dataclass
 class ParsedOffer:
+    is_offer: bool | None = None
+    rejection_reason: str | None = None
     product_name: str | None = None
     price: float | None = None
     price_original: float | None = None
@@ -126,6 +128,7 @@ def parse_regex(text: str) -> ParsedOffer:
         confidence += 0.2
 
     return ParsedOffer(
+        is_offer=bool(product_name and price is not None and links),
         product_name=product_name,
         price=price,
         price_original=price_original,
