@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
 
-from app.models import Channel, Offer
+from app.models import Category, Offer
+from app.money import parse_brl_to_cents
 
 # Presets exibidos no dropdown do filtro de tempo (portal) — além destes,
 # qualquer valor inteiro entre 1 e MAX_DAYS também é aceito (ex.: um link
@@ -15,7 +16,6 @@ from app.models import Channel, Offer
 # Limitado a 7 dias porque é também o teto de RETENTION_DAYS (app/config.py).
 DAYS_PRESETS = (1, 3, 7)
 MAX_DAYS = 7
-MAX_PRICE = 1_000_000.0
 
 # Default de `days` quando a API pública é chamada sem o parâmetro — mais
 # curto que o MAX_DAYS do portal porque consumidores de API tendem a querer
@@ -27,7 +27,7 @@ DEFAULT_PER_CHANNEL = 10
 # texto roda em Python (ver `matches_query`), então buscamos um pouco além
 # do limite final de exibição pra não perder itens relevantes que a busca
 # textual descarte depois do corte do SQL.
-SQL_PREFETCH_LIMIT = 2000
+SQL_PREFETCH_LIMIT = 5000
 RESULT_LIMIT = 200
 
 
@@ -41,12 +41,12 @@ def normalize(value: str) -> str:
 
 
 def matches_query(offer: Offer, terms: list[str]) -> bool:
-    """Busca robusta: cada termo (palavra) da query precisa aparecer em
-    algum lugar do nome do produto ou do texto bruto, em qualquer ordem —
-    ao contrário de um LIKE simples com a frase inteira, "rtx 5060 16gb"
-    acha um post que tenha essas 3 palavras em qualquer posição/ordem, e
-    não depende de acento/caixa."""
-    haystack = normalize(f"{offer.product_name or ''} {offer.raw_text or ''}")
+    """Busca somente no nome normalizado publicado.
+
+    O texto bruto é privado e contém propaganda, nomes de grupos e listas de
+    produtos não relacionados, que geravam falsos positivos.
+    """
+    haystack = normalize(offer.product_name or "")
     return all(term in haystack for term in terms)
 
 
@@ -66,65 +66,38 @@ def parse_days(days: str | None) -> int | None:
     return None
 
 
-def parse_price(value: str | float | None) -> float | None:
-    """Mesma filosofia do parse_days: entrada inválida (negativa, não
-    numérica, absurda) vira "sem filtro de preço", não erro 422."""
-    if value is None or value == "":
-        return None
-    try:
-        candidate = float(value)
-    except (ValueError, TypeError):
-        return None
-    if 0 <= candidate <= MAX_PRICE:
-        return candidate
-    return None
-
-
-GENERIC_SOURCE_LABEL = "Fonte reservada"
-
-
-def load_hidden_channel_keys(session: Session) -> set[tuple[str, str]]:
-    """Conjunto de (platform, chat_id) com `hide_brand=True` — usado pra
-    decidir, na hora de montar a resposta (portal ou API), se o nome real
-    do canal deve ser trocado por um rótulo genérico. Uma query só por
-    request, não por oferta."""
-    rows = session.exec(select(Channel.platform, Channel.chat_id).where(Channel.hide_brand == True)).all()  # noqa: E712
-    return {(platform, str(chat_id)) for platform, chat_id in rows}
-
-
-def display_source_label(offer: Offer, hidden_keys: set[tuple[str, str]]) -> str:
-    """Nome do canal a exibir pro público: o rótulo real, a menos que o
-    canal tenha `hide_brand=True` na admin UI, caso em que mostramos um
-    rótulo genérico (a oferta continua visível, só a marca é ocultada)."""
-    key = (offer.source_platform, str(offer.source_group))
-    if key in hidden_keys:
-        return GENERIC_SOURCE_LABEL
-    return offer.source_label
+def parse_price(value: str | float | None) -> int | None:
+    return parse_brl_to_cents(value)
 
 
 def query_offers(
     session: Session,
     *,
     q: str | None = None,
-    source_group: str | None = None,
+    category_slug: str | None = None,
     days_int: int | None = None,
-    price_min: float | None = None,
-    price_max: float | None = None,
+    price_min_cents: int | None = None,
+    price_max_cents: int | None = None,
     limit: int = RESULT_LIMIT,
 ) -> list[Offer]:
     """Filtro central (sem o caso especial de "home sem filtro nenhum",
     que é só do portal — ver routes_web.py)."""
     stmt = select(Offer).where(Offer.archived == False).order_by(Offer.posted_at.desc())  # noqa: E712
 
-    if source_group:
-        stmt = stmt.where(Offer.source_group == source_group)
+    if category_slug:
+        category_id = session.exec(
+            select(Category.id).where(Category.slug == category_slug)
+        ).first()
+        if category_id is None:
+            return []
+        stmt = stmt.where(Offer.category_id == category_id)
     if days_int:
         cutoff = datetime.utcnow() - timedelta(days=days_int)
         stmt = stmt.where(Offer.posted_at >= cutoff)
-    if price_min is not None:
-        stmt = stmt.where(Offer.price >= price_min)
-    if price_max is not None:
-        stmt = stmt.where(Offer.price <= price_max)
+    if price_min_cents is not None:
+        stmt = stmt.where(Offer.price_cents >= price_min_cents)
+    if price_max_cents is not None:
+        stmt = stmt.where(Offer.price_cents <= price_max_cents)
 
     if q:
         # Pré-filtro grosseiro no SQL (o texto ainda é filtrado fino em

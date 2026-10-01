@@ -28,8 +28,8 @@ def test_matches_query_is_word_order_independent():
 
 
 def test_matches_query_is_accent_insensitive():
-    offer = _offer(product_name="Geladeira Panasonic Frost Free", raw_text="promoção relâmpago")
-    assert matches_query(offer, ["promocao", "relampago"])
+    offer = _offer(product_name="Placa de Vídeo GeForce RTX 5070")
+    assert matches_query(offer, ["placa", "video"])
 
 
 def test_matches_query_requires_all_terms():
@@ -38,6 +38,9 @@ def test_matches_query_requires_all_terms():
     assert matches_query(offer, ["notebook", "dell"])
 
 
-def test_matches_query_searches_raw_text_too():
-    offer = _offer(product_name=None, raw_text="Fone de ouvido JBL Tune 510BT por R$149")
-    assert matches_query(offer, ["jbl", "510bt"])
+def test_matches_query_does_not_search_private_raw_text():
+    offer = _offer(
+        product_name="Gabinete Gamer Aquário Mancer CV700L",
+        raw_text="Compatível com placa de vídeo de até 400 mm",
+    )
+    assert not matches_query(offer, ["placa", "video"])

@@ -15,9 +15,25 @@ from app.config import (
 )
 from app.db import get_session
 from app.models import LlmUsageEvent
+from app.money import cents_to_amount, parse_brl_to_cents
 from app.parsers.regex_parser import ParsedOffer
 
 logger = logging.getLogger(__name__)
+
+ALLOWED_CATEGORIES = (
+    "informatica",
+    "celulares",
+    "eletronicos",
+    "games",
+    "eletrodomesticos",
+    "casa-cozinha",
+    "moda-beleza",
+    "mercado",
+    "esporte-lazer",
+    "ferramentas-automotivo",
+    "viagens-servicos",
+    "outros",
+)
 
 _PROMPT = """Você é o Offer Formatter do descont.io. Analise uma entrada bruta \
 recebida de uma fonte privada. Decida se ela anuncia uma oferta comercial \
@@ -34,8 +50,11 @@ os dados da oferta, de forma agnóstica à origem. Responda SOMENTE com JSON:
   "price": <preço final em número, ou null>,
   "price_original": <preço original antes do desconto, ou null>,
   "coupon_code": "<código do cupom, ou null>",
-  "offer_url": "<URL que leva à oferta ou null>"
+  "offer_url": "<URL que leva à oferta ou null>",
+  "category_slug": "<uma das categorias permitidas>"
 }}
+
+Categorias permitidas: {categories}
 
 Texto:
 ---
@@ -44,7 +63,7 @@ Texto:
 """
 
 
-def _record_usage(payload: dict, success: bool) -> None:
+def _record_usage(payload: dict, success: bool, operation: str = "offer_formatter") -> None:
     usage = payload.get("usage") or {}
     # OpenAI usa prompt/completion; Abacus RouteLLM usa input/output.
     prompt_tokens = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
@@ -61,7 +80,7 @@ def _record_usage(payload: dict, success: bool) -> None:
             session.add(
                 LlmUsageEvent(
                     model=payload.get("model") or LLM_MODEL,
-                    operation="offer_formatter",
+                    operation=operation,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
@@ -94,7 +113,15 @@ def parse_llm(text: str) -> ParsedOffer:
             },
             json={
                 "model": LLM_MODEL,
-                "messages": [{"role": "user", "content": _PROMPT.format(text=text)}],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": _PROMPT.format(
+                            text=text,
+                            categories=", ".join(ALLOWED_CATEGORIES),
+                        ),
+                    }
+                ],
                 "temperature": 0,
                 "response_format": {"type": "json_object"},
             },
@@ -115,9 +142,14 @@ def parse_llm(text: str) -> ParsedOffer:
         is_offer=bool(data.get("is_offer")),
         rejection_reason=data.get("rejection_reason"),
         product_name=data.get("product_name"),
-        price=data.get("price"),
-        price_original=data.get("price_original"),
+        price=cents_to_amount(parse_brl_to_cents(data.get("price"))),
+        price_original=cents_to_amount(parse_brl_to_cents(data.get("price_original"))),
         coupon_code=data.get("coupon_code"),
+        category_slug=(
+            data.get("category_slug")
+            if data.get("category_slug") in ALLOWED_CATEGORIES
+            else "outros"
+        ),
         links=[data["offer_url"]] if data.get("offer_url") else [],
         confidence=0.9 if data.get("is_offer") else 1.0,
     )

@@ -11,7 +11,8 @@ from sqlmodel import select
 
 from app.config import IMAGE_MAX_WIDTH, IMAGE_QUALITY, MEDIA_DIR
 from app.db import get_session
-from app.models import Offer, RejectedInput
+from app.models import Category, Offer, RejectedInput
+from app.money import amount_to_cents
 from app.parsers.pipeline import extract
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,12 @@ def ingest_post(
             )
             return None
 
+        category = None
+        if parsed.category_slug:
+            category = session.exec(
+                select(Category).where(Category.slug == parsed.category_slug)
+            ).first()
+
         offer = Offer(
             source_platform=platform,
             source_group=group_id,
@@ -108,10 +115,13 @@ def ingest_post(
             product_name=parsed.product_name,
             price=parsed.price,
             price_original=parsed.price_original,
+            price_cents=amount_to_cents(parsed.price),
+            price_original_cents=amount_to_cents(parsed.price_original),
             coupon_code=parsed.coupon_code,
             source_links=json.dumps(parsed.links),
             links=json.dumps(parsed.links),
-            category=category_default,
+            category=category.name if category else category_default,
+            category_id=category.id if category else None,
             parse_method=method,
             parse_confidence=parsed.confidence,
             engagement_score=engagement_score,

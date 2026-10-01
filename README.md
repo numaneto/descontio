@@ -65,7 +65,8 @@ O pipeline em `app/parsers/pipeline.py` segue esta ordem:
    - `price`;
    - `price_original`;
    - `coupon_code`;
-   - `offer_url`.
+   - `offer_url`;
+   - `category_slug`, restrito à taxonomia controlada.
 4. Entradas rejeitadas ficam em `rejected_inputs` por sete dias, sem imagem.
 5. Ofertas aceitas são persistidas e publicadas.
 
@@ -120,14 +121,24 @@ Endpoints:
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/v1/offers` | Lista ofertas com busca, período e faixa de preço |
+| `GET` | `/api/v1/offers` | Lista ofertas com busca, categoria, período e faixa de preço |
 | `GET` | `/api/v1/offers/{id}` | Retorna uma oferta não arquivada |
 
 Exemplo:
 
 ```bash
-curl 'http://localhost:8000/api/v1/offers?q=notebook&days=3&price_max=3000&limit=20'
+curl 'http://localhost:8000/api/v1/offers?q=notebook&category=informatica&days=3&price_max_cents=300000&limit=20'
 ```
+
+A unidade monetária canônica da API é centavos inteiros: `price_cents=506000`
+representa `R$ 5.060,00`, sempre com `currency="BRL"`. Os campos decimais
+legados `price`/`price_original` e os filtros `price_min`/`price_max` continuam
+disponíveis por compatibilidade; integrações novas devem usar
+`price_cents`/`price_original_cents` e `price_min_cents`/`price_max_cents`.
+
+O portal aceita preços em notação brasileira (`5.060,00`, `5060,00`) ou de
+máquina (`5060.00`). A busca remove acentos e consulta somente o nome público
+normalizado, nunca o texto bruto privado da origem.
 
 A API é aberta para leitura:
 
@@ -240,15 +251,15 @@ credenciais no repositório.
 PYTHONPATH=. pytest -q
 ```
 
-Os testes cobrem formatos reais do parser, busca textual e decisões básicas do
-pré-filtro/formatter.
+Os testes cobrem formatos reais do parser, dinheiro em centavos, limites de
+preço, categorias, busca sem acentos e decisões básicas do pré-filtro/formatter.
 
 ## Próximas etapas
 
 - conectores para e-mail/newsletter, crawlers e APIs;
 - transformação de links por programa de afiliados;
 - obtenção de imagens limpas diretamente da página do produto;
-- classificação automática em `Category`/`Product`;
+- normalização de produtos canônicos em `Product`;
 - wizard de configuração inicial;
 - rate limit compartilhado caso a aplicação passe a usar múltiplos workers.
 

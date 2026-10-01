@@ -9,9 +9,9 @@
     <div class="offer-body">
         <h3>{{ offer.product_name or "(produto não identificado)" }}</h3>
         <p class="price">
-            {% if offer.price %}
-                {% if offer.price_original %}<span class="original">R$ {{ "%.2f"|format(offer.price_original) }}</span>{% endif %}
-                <span class="final">R$ {{ "%.2f"|format(offer.price) }}</span>
+            {% if offer.price_cents is not none %}
+                {% if offer.price_original_cents is not none %}<span class="original">{{ offer.price_original_cents | brl }}</span>{% endif %}
+                <span class="final">{{ offer.price_cents | brl }}</span>
             {% endif %}
         </p>
         {% if offer.coupon_code %}

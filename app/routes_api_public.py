@@ -11,9 +11,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+from sqlmodel import select
 
 from app.db import get_session
-from app.models import Offer
+from app.models import Category, Offer
 from app.offers_query import (
     API_DEFAULT_DAYS,
     MAX_DAYS,
@@ -36,17 +37,21 @@ class OfferOut(BaseModel):
     product_name: str | None
     price: float | None
     price_original: float | None
+    price_cents: int | None
+    price_original_cents: int | None
+    currency: str = "BRL"
     coupon_code: str | None
     links: list[str]
     image_url: str | None
     category: str | None
+    category_slug: str | None
     posted_at: datetime
 
     class Config:
         from_attributes = True
 
 
-def _to_offer_out(offer: Offer) -> OfferOut:
+def _to_offer_out(offer: Offer, category: Category | None = None) -> OfferOut:
     try:
         links = json.loads(offer.links or "[]")
     except json.JSONDecodeError:
@@ -59,10 +64,13 @@ def _to_offer_out(offer: Offer) -> OfferOut:
         product_name=offer.product_name,
         price=offer.price,
         price_original=offer.price_original,
+        price_cents=offer.price_cents,
+        price_original_cents=offer.price_original_cents,
         coupon_code=offer.coupon_code,
         links=links,
         image_url=f"/media/{offer.image_path}" if offer.image_path else None,
-        category=offer.category,
+        category=category.name if category else offer.category,
+        category_slug=category.slug if category else None,
         posted_at=posted_at,
     )
 
@@ -75,32 +83,44 @@ class OfferListOut(BaseModel):
 @router.get("/offers", response_model=OfferListOut, dependencies=[RateLimited])
 def list_offers(
     q: str | None = Query(default=None, description="Busca por palavra-chave (múltiplos termos, sem acento/caixa)"),
+    category: str | None = Query(default=None, description="Slug da categoria"),
     days: str | None = Query(
         default=None,
         description=f"Só ofertas dos últimos N dias (1-{MAX_DAYS}). Default {API_DEFAULT_DAYS} se omitido.",
     ),
     price_min: str | None = Query(default=None, description="Preço mínimo (R$)"),
     price_max: str | None = Query(default=None, description="Preço máximo (R$)"),
+    price_min_cents: int | None = Query(default=None, ge=0, description="Preço mínimo em centavos (preferencial)"),
+    price_max_cents: int | None = Query(default=None, ge=0, description="Preço máximo em centavos (preferencial)"),
     limit: int = Query(default=60, ge=1, le=MAX_LIMIT, description=f"Máximo de itens retornados (até {MAX_LIMIT})"),
 ) -> OfferListOut:
     # Sem `days` explícito, a API assume uma janela curta (ofertas mudam
     # rápido) em vez de devolver o histórico inteiro — ver offers_query.py.
     days_int = parse_days(days) if days is not None else API_DEFAULT_DAYS
-    price_min_val = parse_price(price_min)
-    price_max_val = parse_price(price_max)
-    if price_min_val is not None and price_max_val is not None and price_min_val > price_max_val:
-        price_min_val = price_max_val = None
+    minimum_cents = price_min_cents if price_min_cents is not None else parse_price(price_min)
+    maximum_cents = price_max_cents if price_max_cents is not None else parse_price(price_max)
+    if minimum_cents is not None and maximum_cents is not None and minimum_cents > maximum_cents:
+        minimum_cents = maximum_cents = None
 
     with get_session() as session:
         offers = query_offers(
             session,
             q=q,
+            category_slug=category,
             days_int=days_int,
-            price_min=price_min_val,
-            price_max=price_max_val,
+            price_min_cents=minimum_cents,
+            price_max_cents=maximum_cents,
             limit=limit,
         )
-    return OfferListOut(count=len(offers), results=[_to_offer_out(o) for o in offers])
+        category_ids = {offer.category_id for offer in offers if offer.category_id is not None}
+        categories = (
+            session.exec(select(Category).where(Category.id.in_(category_ids))).all()
+            if category_ids
+            else []
+        )
+        category_by_id = {item.id: item for item in categories}
+        results = [_to_offer_out(offer, category_by_id.get(offer.category_id)) for offer in offers]
+    return OfferListOut(count=len(results), results=results)
 
 
 @router.get("/offers/{offer_id}", response_model=OfferOut, dependencies=[RateLimited])
@@ -109,4 +129,5 @@ def get_offer(offer_id: int) -> OfferOut:
         offer = session.get(Offer, offer_id)
         if offer is None or offer.archived:
             raise HTTPException(status_code=404, detail="oferta nao encontrada")
-        return _to_offer_out(offer)
+        category = session.get(Category, offer.category_id) if offer.category_id else None
+        return _to_offer_out(offer, category)

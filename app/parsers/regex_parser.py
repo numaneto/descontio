@@ -61,6 +61,7 @@ class ParsedOffer:
     price: float | None = None
     price_original: float | None = None
     coupon_code: str | None = None
+    category_slug: str | None = None
     links: list[str] = field(default_factory=list)
     confidence: float = 0.0
 

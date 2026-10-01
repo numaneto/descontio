@@ -24,6 +24,8 @@ class Offer(SQLModel, table=True):
     product_name: Optional[str] = None
     price: Optional[float] = None
     price_original: Optional[float] = None
+    price_cents: Optional[int] = Field(default=None, index=True)
+    price_original_cents: Optional[int] = None
     coupon_code: Optional[str] = None
     # `source_links` é privado/auditável; `links` contém somente URLs
     # públicas já transformadas pelas regras de afiliado.
