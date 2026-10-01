@@ -13,9 +13,6 @@ TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID", "")
 TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 TELEGRAM_SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "")
 
-# WhatsApp
-WHATSAPP_WEBHOOK_SECRET = os.getenv("WHATSAPP_WEBHOOK_SECRET", "")
-
 # Banco de dados
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/descontio.db")
 
@@ -27,11 +24,9 @@ IMAGE_QUALITY = int(os.getenv("IMAGE_QUALITY", "80"))
 
 # Retenção: após RETENTION_DAYS, a oferta é arquivada (some da busca padrão
 # do portal) e a imagem física é apagada do disco (o texto/metadados ficam).
-# 15 dias (não 90): ofertas mudam rápido — pesquisa de mercado mostra que a
-# mediana de validade de um cupom/promoção é ~7 dias, e a maioria dos
-# aggregators mantém o item "buscável" por no máximo ~15-30 dias depois
-# disso. Ver docs/07-descontio.md (home-nw-docs) pra decisão completa.
-RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "15"))
+# 7 dias: ofertas e cupons mudam rápido, então o portal mantém uma janela
+# curta e previsível. Ver docs/07-descontio.md (home-nw-docs).
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
 
 # LLM fallback
 LLM_ENABLED = os.getenv("LLM_ENABLED", "false").lower() == "true"

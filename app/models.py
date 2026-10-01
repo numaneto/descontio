@@ -11,9 +11,9 @@ class Offer(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Origem (chave de deduplicação: mesma plataforma+grupo+message_id nunca duplica)
-    source_platform: str = Field(index=True)  # "telegram" | "whatsapp"
-    source_group: str = Field(index=True)  # chat_id/JID bruto
-    source_label: str = ""  # nome de exibição do grupo/canal
+    source_platform: str = Field(index=True)  # "telegram" | "email" | "crawler" | "api"
+    source_group: str = Field(index=True)  # identificador interno da origem
+    source_label: str = ""  # rótulo interno; nunca deve ser exposto ao público
     source_message_id: str = Field(index=True)
 
     # Conteúdo bruto

@@ -3,37 +3,36 @@
 > Nome do repositório: `descontio` (`github.com/numaneto/descontio`), nome de
 > marca/produto voltado pro usuário: **descont.io**.
 
-Agregador pessoal de promoções: junta os posts de ofertas que já circulam em
-grupos/canais do **Telegram** e **canais do WhatsApp** — texto, foto e link,
-tal como o autor original postou — num único portal web pesquisável, com
-filtro por data, loja e palavra-chave.
+Portal e API de ofertas e descontos. Entradas de fontes diferentes são
+normalizadas para um formato único de oferta: produto, imagem, preço, link e
+cupom opcional. A origem é mantida apenas internamente para auditoria,
+deduplicação e operação; o portal público não identifica grupos ou canais.
 
-Não é um scraper de e-commerce nem um indexador de catálogo: a ideia é
-simplesmente **compilar e organizar** o que os próprios grupos de ofertas já
-publicam, num lugar só, em vez de acompanhar 10 grupos separados.
+O Telegram é a primeira fonte em produção. A arquitetura deve aceitar também
+e-mail, newsletters, crawlers e APIs sem alterar o formato público da oferta.
 
 ## Como funciona
 
-```
-Telegram (grupos/canais)  ──┐
-                             ├──> Parser híbrido ──> SQLite ──> Portal web (FastAPI + HTMX)
-WhatsApp (canais)         ──┘      (regex + LLM
-                                     fallback)
+```text
+Telegram / e-mail / crawler / API
+               |
+               v
+       Offer Formatter
+  valida + extrai + normaliza
+               |
+               v
+        SQLite / mídia
+          |         |
+          v         v
+       Portal     API pública
 ```
 
-- **Captura Telegram**: `workers/telegram_worker.py`, um *user-client*
+- **Captura Telegram**: `scripts/poll_telegram.py`, um *user-client*
   (biblioteca [Telethon](https://docs.telethon.dev/)), conectado com a sua
   própria conta — não um bot. Isso é necessário porque muitos grupos de
   ofertas não aceitam bots ou banem quem entra só com bot; um user-client lê
-  passivamente qualquer grupo/canal que a conta já participa/segue.
-- **Captura WhatsApp**: reaproveita uma instância existente do
-  [Evolution API](https://github.com/EvolutionAPI/evolution-api) (não faz
-  parte deste repo — é uma peça de infraestrutura separada). Configure um
-  webhook do evento `messages.upsert` apontando pra
-  `POST /webhook/whatsapp` deste serviço. Canais do WhatsApp chegam pelo
-  mesmo evento, com `remoteJid` terminando em `@newsletter` (grupos normais
-  terminam em `@g.us`) — o filtro de quais chats processar é feito via
-  `config/channels.yaml`.
+  passivamente os canais configurados. O polling roda em ciclos curtos via
+  cron e persiste o último ID processado por canal.
 - **Parser híbrido**: a maioria dos grupos de ofertas já usa um formato
   bem definido (`Valor:`, `Cupom:`, `Link:`, `De:`/`Por:`, hashtag
   `#Anuncio`) — `app/parsers/regex_parser.py` extrai isso com regex, sem
@@ -42,8 +41,7 @@ WhatsApp (canais)         ──┘      (regex + LLM
   OpenAI-compatible configurável — ex: um Copilot Bridge/Ollama/OpenAI
   próprio) pedindo JSON estruturado. Ver `app/parsers/pipeline.py`.
 - **Portal**: FastAPI + Jinja2 + HTMX (sem build JS), grid de cards com
-  foto/produto/preço/cupom/link, busca full-text (SQLite FTS5) e filtros
-  por data/loja/grupo de origem.
+  foto/produto/preço/cupom/link e filtros por data, preço e palavra-chave.
 
 ## Rodando localmente (dev)
 
@@ -56,11 +54,11 @@ python scripts/init_db.py
 uvicorn app.main:app --reload --port 8000
 ```
 
-Em outro terminal, o worker do Telegram (precisa de uma sessão autorizada —
-ver "Configurando o Telegram" abaixo):
+Em outro terminal, execute um ciclo do polling do Telegram (precisa de uma
+sessão autorizada — ver "Configurando o Telegram" abaixo):
 
 ```bash
-python workers/telegram_worker.py
+python scripts/poll_telegram.py
 ```
 
 ## Rodando em produção (Docker Compose)
@@ -71,12 +69,8 @@ cp config/channels.example.yaml config/channels.yaml
 docker compose up -d --build
 ```
 
-Serviços:
-- `web`: portal (porta `8000`).
-- `telegram-worker`: processo de longa duração conectado ao Telegram.
-
-O webhook do WhatsApp é servido pelo próprio `web` em `/webhook/whatsapp` —
-aponte o Evolution API pra ele (via reverse-proxy, se exposto fora da LAN).
+O serviço `web` publica o portal e a API na porta `8000`. Em produção, o
+polling do Telegram é disparado externamente por cron a cada cinco minutos.
 
 ## Configurando o Telegram (user-client)
 
@@ -93,22 +87,8 @@ aponte o Evolution API pra ele (via reverse-proxy, se exposto fora da LAN).
    Coloque em `TELEGRAM_SESSION_STRING` no `.env` (ou no gerenciador de
    segredos do seu deploy).
 4. Edite `config/channels.yaml` com os `chat_id`/username dos grupos e
-   canais que você já participa/segue — o worker só processa o que estiver
+   canais que você já participa/segue — o polling só processa o que estiver
    listado ali.
-
-## Configurando o WhatsApp (Evolution API)
-
-Pressupõe que você já tem uma instância do Evolution API rodando e
-conectada ao seu número (não é escopo deste repo). Configure o webhook da
-instância pra enviar o evento `messages.upsert` pra:
-
-```
-POST https://<seu-deploy>/webhook/whatsapp
-Header: X-Webhook-Secret: <WHATSAPP_WEBHOOK_SECRET do .env>
-```
-
-Siga/entre nos canais que você quer capturar com o número conectado, e
-adicione o JID (`...@newsletter`) em `config/channels.yaml`.
 
 ## Extensão do parser (LLM fallback)
 
@@ -120,15 +100,11 @@ própria OpenAI). O fallback só é chamado quando o regex não encontra preço
 
 ## Privacidade e responsabilidade
 
-- Este projeto **não redistribui** conteúdo de terceiros publicamente — é
-  uma ferramenta de auto-hospedagem para uso pessoal, agregando grupos dos
-  quais você já é membro/seguidor.
 - Nenhuma credencial (session string do Telegram, chaves de API, segredo do
-  webhook) deve ser commitada — use `.env` (git-ignorado) ou um gerenciador
-  de segredos.
+  provedor de LLM) deve ser commitada — use `.env` (git-ignorado) ou um
+  gerenciador de segredos.
 - Ao rodar publicamente, você é responsável por respeitar os termos de uso
-  do Telegram/WhatsApp e direitos de imagem/conteúdo de terceiros no seu
-  próprio deploy.
+  das fontes, programas de afiliados e direitos de imagem/conteúdo.
 
 ## Licença
 
