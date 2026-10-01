@@ -11,17 +11,3 @@ services:
       - ./media:/app/media
       - ./config/channels.yaml:/app/config/channels.yaml:ro
     restart: unless-stopped
-
-  telegram-worker:
-    build: .
-    command: ["python", "workers/telegram_worker.py"]
-    environment:
-      - PYTHONPATH=/app
-    env_file: .env
-    volumes:
-      - ./data:/app/data
-      - ./media:/app/media
-      - ./config/channels.yaml:/app/config/channels.yaml:ro
-    restart: unless-stopped
-    depends_on:
-      - web
