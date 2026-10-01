@@ -122,3 +122,21 @@ class Channel(SQLModel, table=True):
     # genérico em vez do nome real do canal — a oferta continua visível,
     # só a marca/fonte fica oculta.
     hide_brand: bool = Field(default=False)
+
+
+class ApiKey(SQLModel, table=True):
+    """Chave de acesso da API pública — opcional: sem key, o consumidor cai
+    no rate limit anônimo (bem baixo, ver app/rate_limit.py); com uma key
+    válida, usa o `rate_limit_per_hour` configurado aqui (default bem mais
+    alto). A chave em si NUNCA é armazenada em texto puro — só o hash
+    SHA-256 (`key_hash`); o valor real só é mostrado uma vez, no momento da
+    criação (ver app/routes_admin.py)."""
+
+    __tablename__ = "api_keys"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    key_hash: str = Field(index=True, unique=True)
+    label: str  # identifica o dono/uso da key (ex.: "app do Fulano")
+    rate_limit_per_hour: int = Field(default=1000)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    revoked_at: Optional[datetime] = None
